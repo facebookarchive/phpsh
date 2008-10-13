@@ -1,0 +1,15 @@
+Loading ctags
+Starting php
+type 'h' or 'help' to see instructions & features
+php> =4
+5
+php> ="4\n5"
+4
+5
+php> 
+php> 
+php> 
+php> 
+php> ='hi'
+hi
+php> 

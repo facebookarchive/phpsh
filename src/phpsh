@@ -1,0 +1,148 @@
+#!/usr/bin/env python
+
+__version__ = "1.1"
+__author__ = "phpsh@facebook.com"
+__date__ = "Sep 29, 2008"
+
+from optparse import OptionParser
+from phpsh import PhpshState, PhpMultiliner, do_sugar, line_encode
+import sys
+
+usage = """~/www> phpsh [options] [extra-includes]
+phpsh is an interactive shell into a php codebase."""
+p = OptionParser(usage)
+p.add_option("-c", "--codebase-mode",
+    help="""Use "-c none" to load no codebase.
+See /etc/phpsh/phpshrc.php for other codebase modes.""")
+p.add_option("-t", "--test-file",
+    help="""Run a saved-phpsh-session unit test file.
+See test/ in the phpsh distribution for examples.""")
+p.add_option("-v", "--version", action="store_true",
+    help="""Display version info and exit.""")
+# are we cool with these negated opts?  at least they indicate the defaults..
+p.add_option("-A", "--no-autocomplete", action="store_true")
+p.add_option("-C", "--no-color", action="store_true")
+p.add_option("-M", "--no-multiline", action="store_true")
+p.add_option("-T", "--no-ctags", action="store_true")
+(opts, cmd_incs) = p.parse_args()
+
+if opts.version:
+    print "phpsh version " + __version__
+    print "http://www.phpsh.org"
+    print __author__
+    sys.exit(0)
+
+# default codebase_mode is "" (don't want None)
+if not opts.codebase_mode:
+    opts.codebase_mode = ""
+
+do_multiline = not opts.no_multiline
+
+s = PhpshState(cmd_incs=set(cmd_incs),
+    do_color=not opts.no_color and not opts.test_file,
+    do_echo=not opts.test_file, codebase_mode=opts.codebase_mode,
+    do_autocomplete=not opts.no_autocomplete, do_ctags=not opts.no_ctags,
+    interactive=not opts.test_file)
+
+if opts.test_file:
+    # TODO support multiline in test-mode
+    # TODO? test-mode shouldn't support r/c/i etc should it?  maybs r?  but q?
+    # parse test file
+    # this is not perfect since output lines could start with "php> " (!!)
+    test_f = file(opts.test_file)
+    in_line = None 
+    in_line_n = None
+    out_lines = []
+    test_pairs = []
+    line_n = 1
+    while True:
+        l = test_f.readline()
+        if not l:
+            break
+        l = l[:-1]
+        if l.startswith(s.php_prompt):
+            if in_line:
+                test_pairs.append((in_line, out_lines, in_line_n))
+            out_lines = []
+            in_line = l[len(s.php_prompt):]
+            in_line_n = line_n
+        elif in_line:
+            out_lines.append(l)
+        line_n += 1
+    if in_line:
+        test_pairs.append((in_line, out_lines, in_line_n))
+    test_f.close()
+    test_pairs_iter = test_pairs.__iter__()
+    test_cur = None
+
+    # run through test pairs
+    error_num = 0
+    for in_line, out_lines, in_line_n in test_pairs:
+        out_lines = "\n".join(out_lines)
+        out_lines_now = s.do_expr(line_encode(do_sugar(in_line)))[:-1]
+        if out_lines_now != out_lines:
+            error_num += 1
+            print s.clr_err + "ERROR Line " + str(in_line_n) + " mismatch:"
+            print "---Command:---"
+            print in_line
+            print "---Expected:---"
+            print out_lines
+            print "---Got:---"
+            print out_lines_now
+            print "----------" + s.clr_default
+    s.close()
+    if error_num:
+        print "%d of %d tests failed." % (error_num, len(test_pairs))
+        sys.exit(-1)
+    else:
+        print "All %d tests passed." % len(test_pairs)
+        sys.exit(0)
+
+
+if do_multiline:
+    m = PhpMultiliner()
+
+# main loop
+new_expr = True
+while True:
+    if new_expr:
+        prompt = s.php_prompt
+    else:
+        prompt = s.php_more_prompt
+    try:
+        line = raw_input(prompt)
+    except EOFError:
+        break
+    except KeyboardInterrupt:
+        print
+        if do_multiline:
+            m.clear()
+        new_expr = True
+        continue
+    if new_expr:
+        t_c_ret = s.try_command(line)
+        if t_c_ret == PhpshState.quit_command:
+            break
+        elif t_c_ret == PhpshState.yes_command:
+            continue
+    line_ready = None
+    if do_multiline:
+        (m_res, m_str) = m.input_line(line)
+        if m_res == PhpMultiliner.complete:
+            line_ready = m_str
+        elif m_res == PhpMultiliner.syntax_error:
+            print s.clr_err + \
+                "Multiline input has no syntactic completion:"
+            print m_str + s.clr_default
+            m.clear()
+            line_ready = ""
+    else:
+        line_ready = line_encode(do_sugar(line))
+    if line_ready != None:
+        if line_ready:
+            s.write()
+            s.do_expr(line_ready)
+        new_expr = True
+    else:
+        new_expr = False
+s.close()

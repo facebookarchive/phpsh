@@ -1,0 +1,4 @@
+#!/usr/bin/env php
+<?php
+error_reporting(E_PARSE);
+eval('return;'.$argv[1]);

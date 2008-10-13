@@ -1,0 +1,44 @@
+To install:
+~ python setup.py build
+~ sudo python setup.py install
+(Will download and install the pysqlite dependency for you if needed.)
+
+The buildscript uses setuptools.  This comes with python >= 2.5.
+If you are using older python, go grab EasyInstall:
+http://peak.telecommunity.com/DevCenter/EasyInstall#installing-easy-install
+
+To set up after install:
+- If you just want to use vanilla php, just do ~ phpsh  and have fun.
+- To connect to an actual codebase, e.g.:
+  ~ cd ~/www
+  ~ ctags -R            # for phpsh ctags integration, recommended
+  ~ phpsh lib/init.php  # or some file(s) that load codebase libraries
+- To get autoloading, modify /etc/phpsh/phpshrc.php.  After that it's just:
+  ~ cd ~/www
+  ~ phpsh
+  And for times when you just want vanilla php:
+  ~ phpsh -c none
+- For individual configuration, also see phpshrc.example.php in the php
+  distribution.
+
+Contact phpsh@facebook.com with any questions.
+
+
+Note to ppl hacking on phpsh:
+- For faster iteration, after installing once, you can run phpsh from src/ 
+directly without reinstalling.  E.g.:
+  ~ cd ~/www
+  ~ ~/projects/phpsh/src/phpsh
+
+Todo for after phpsh 1.1
+- Simple phpsh breakpoints that you can insert into your php code.
+- Maybe phpsh_check_syntax shouldn't actually be installed as a script, and
+  just be a pkg_resource?  Didn't want to worry about zip file overhead, and
+  installing didn't seem like a big deal.
+- Similarly, php_manual.db should probably go in share/ not etc/ but similarly
+  was worried about b.s. with setuptools..
+- Paging for long php> d ..  results?  Or is terminal scroll fine..
+- Thread loading ctags and starting php?  Would speed start but not restart.
+- Command-line apc for faster php startup for large codebases.
+- Note on php start error to start from codebase place?
+- Make tab to show function signature work with multiline func sigs.
