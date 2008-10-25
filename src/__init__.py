@@ -363,7 +363,7 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
                     # line-buffer stdout and stderr
                     if debug:
                         print 'start loop'
-                    s = select.select([self.p.stdout, self.p.stderr], [], [], 
+                    s = select.select([self.p.stdout, self.p.stderr], [], [],
                         comm_poll_timeout)
                     if s == ([], [], []):
                         if debug:
@@ -393,7 +393,7 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
                                     l = self.clr_err + l + self.clr_default
                                     sys.stderr.write(l)
                             out_buff[out_buff_i] = out_buff[out_buff_i][last_nl_pos + 1:]
-                # don't sleep if the command is already done 
+                # don't sleep if the command is already done
                 # (even tho sleep period is small; maximize responsiveness)
                 if self.comm_file.readline():
                     break
@@ -487,7 +487,7 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
                     except:
                         pass
             import manual
-            manual_ret = manual.get_documentation_for_identifier(identifier, 
+            manual_ret = manual.get_documentation_for_identifier(identifier,
                 short=line.startswith("d "))
             if manual_ret:
                 print manual_ret

@@ -10,27 +10,19 @@ import sys
 
 usage = """~/www> phpsh [options] [extra-includes]
 phpsh is an interactive shell into a php codebase."""
-p = OptionParser(usage)
+p = OptionParser(usage=usage, version="%prog " + __version__)
 p.add_option("-c", "--codebase-mode",
     help="""Use "-c none" to load no codebase.
 See /etc/phpsh/phpshrc.php for other codebase modes.""")
 p.add_option("-t", "--test-file",
     help="""Run a saved-phpsh-session unit test file.
 See test/ in the phpsh distribution for examples.""")
-p.add_option("-v", "--version", action="store_true",
-    help="""Display version info and exit.""")
 # are we cool with these negated opts?  at least they indicate the defaults..
 p.add_option("-A", "--no-autocomplete", action="store_true")
 p.add_option("-C", "--no-color", action="store_true")
 p.add_option("-M", "--no-multiline", action="store_true")
 p.add_option("-T", "--no-ctags", action="store_true")
 (opts, cmd_incs) = p.parse_args()
-
-if opts.version:
-    print "phpsh version " + __version__
-    print "http://www.phpsh.org"
-    print __author__
-    sys.exit(0)
 
 # default codebase_mode is "" (don't want None)
 if not opts.codebase_mode:
@@ -50,7 +42,7 @@ if opts.test_file:
     # parse test file
     # this is not perfect since output lines could start with "php> " (!!)
     test_f = file(opts.test_file)
-    in_line = None 
+    in_line = None
     in_line_n = None
     out_lines = []
     test_pairs = []
