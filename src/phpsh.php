@@ -191,8 +191,6 @@ class ___PHPShell___ {
           print "true";
         } elseif ($evalue === false) {
           print "false";
-        } elseif ($evalue === null) {
-          print "null";
         } else {
           print_r($evalue);
         }
