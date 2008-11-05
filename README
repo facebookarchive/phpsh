@@ -31,7 +31,9 @@ directly without reinstalling.  E.g.:
   ~ ~/projects/phpsh/src/phpsh
 
 Todo for after phpsh 1.1
-- Simple phpsh breakpoints that you can insert into your php code.
+- (A) Simple phpsh breakpoints that you can insert into your php code.
+- (B) xdebug integration?
+- (C) magic fatal undoing?
 - Maybe phpsh_check_syntax shouldn't actually be installed as a script, and
   just be a pkg_resource?  Didn't want to worry about zip file overhead, and
   installing didn't seem like a big deal.
@@ -42,3 +44,25 @@ Todo for after phpsh 1.1
 - Command-line apc for faster php startup for large codebases.
 - Note on php start error to start from codebase place?
 - Make tab to show function signature work with multiline func sigs.
+
+About (A: breakpoints):
+jlindamood has suggested adding
+a very basic debugging facility in which phpsh.php would define some
+function called like phpsh_breakpoint() which you would be able to put
+in your code that would cause the php> to re-happen at that breakpoint
+so that you can investigate whatever state until you issue like a
+phpsh_resume() (or whatever it would be called).
+
+My suspicion is that that can be done pretty easily be having a new
+message type from phpsh.php to phpsh.py.  (Currently there is only the          'ready' message when phpsh.php is ready to receive a new line of codes
+from phpsh.py.)
+
+About (B: xdebug):
+march is considering working on this for Nov 5, 2008 hthon
+
+About (C: fatal-undoing):
+brent suggested adding
+some kind of katamari-esque memory snapshotting, so that on fatals like
+calling a nonexistent function (which are not catchable in php-land,
+sadly) can be magically recovered from.  I think dweatherford or larry
+would be good to ask about this kind of black magic.
