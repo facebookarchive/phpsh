@@ -34,6 +34,8 @@ Todo for after phpsh 1.1
 - (A) Simple phpsh breakpoints that you can insert into your php code.
 - (B) xdebug integration?
 - (C) magic fatal undoing?
+- Convert from /tmp file to named pipe for 'ready' message passing
+  http://my.opera.com/zomg/blog/2007/08/29/php-and-named-pipes
 - Maybe phpsh_check_syntax shouldn't actually be installed as a script, and
   just be a pkg_resource?  Didn't want to worry about zip file overhead, and
   installing didn't seem like a big deal.
