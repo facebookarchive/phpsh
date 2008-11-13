@@ -79,8 +79,6 @@ def parse_function_signatures(tags_file_path):
                 line_to_content_end = line_to_content_end[:-1]
             signature = __function_args_regular_expression.match(
                 line_to_content_end).groups()
-            if line.startswith('render_start_form'):
-                print signature
         except ValueError:
             continue
         except AttributeError:
