@@ -1,5 +1,6 @@
 <?php
-# copy this to ~/.phpshrc.php
+# copy this file to ~/.phpsh/phpshrc.php via:
+# mkdir -p ~/.phpsh && cp phpshrc.example.php ~/.phpsh/phpshrc.php
 
 # load any system defaults / codebase-modes
 require_once '/etc/phpsh/phpshrc.php';

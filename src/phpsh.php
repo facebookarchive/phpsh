@@ -26,7 +26,7 @@ ini_set('memory_limit', ini_get('memory_limit') * 2 . 'M');
 ob_start();
 
 $___phpshell___codebase_mode = $argv[2];
-$___phpshell___homerc = getenv('HOME').'/.phpshrc.php';
+$___phpshell___homerc = getenv('HOME').'/.phpsh/phpshrc.php';
 if (file_exists($___phpshell___homerc)) {
   require_once $___phpshell___homerc;
 } else {

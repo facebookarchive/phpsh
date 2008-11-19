@@ -226,7 +226,10 @@ class PhpshState:
         # we set the history length to be something reasonable
         # so that we don't write a ridiculously huge file every time
         # someone executes a command
-        self.history_file = os.path.join(os.environ["HOME"], ".phpsh.history")
+        home_phpsh_dir = os.path.join(os.environ["HOME"], ".phpsh")
+        if not os.path.exists(home_phpsh_dir):
+            os.mkdir(home_phpsh_dir)
+        self.history_file = os.path.join(home_phpsh_dir, "history")
         readline.set_history_length(100)
 
         try:
