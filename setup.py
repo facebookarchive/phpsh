@@ -13,7 +13,7 @@ setup(
     package_data={'phpsh': ['*.php']},
     scripts=['src/phpsh', 'src/phpsh_check_syntax'],
     data_files=[
-        ('/etc/phpsh', ['src/phpshrc.php', 'src/php_manual.db']),
+        ('/etc/phpsh', ['src/rc.php', 'src/php_manual.db']),
     ],
     install_requires=['pysqlite'],
 )
