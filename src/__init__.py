@@ -1,6 +1,7 @@
 from subprocess import Popen, PIPE
 import ansicolor as clr
 import cmd_util as cu
+import ConfigParser
 import os
 import re
 import readline
@@ -8,6 +9,7 @@ import select
 import sys
 import tempfile
 import time
+import signal
 
 comm_poll_timeout = 0.01
 
@@ -57,6 +59,7 @@ See phpsh -h for invocation options.
     V     Open vim (not read-only) and reload (r) upon return to phpsh.
     e     Open emacs where a function or other identifer is defined.
              ex: php> e some_function
+    x [=]function([args]) Execute function() with args under debugger
     c     Append new includes without restarting; display includes.
     C     Change includes without restarting; display includes.
     !     Execute a shell command.
@@ -78,6 +81,15 @@ def line_encode(line):
 def inc_args(s):
     """process a string of includes to a set of them"""
     return set([inc.strip() for inc in s.split(" ") if inc.strip()])
+
+def get_php_ext_path():
+   extension_dir = Popen("php-config | grep extension-dir",
+                         shell=True, stdout=PIPE).communicate()[0]
+   lbr = extension_dir.find("[")
+   rbr = extension_dir.find("]")
+   if 0 < lbr < rbr:
+      return extension_dir[lbr+1:rbr]
+
 
 class PhpMultiliner:
     """This encapsulates the process and state of intaking multiple input lines
@@ -141,6 +153,42 @@ class ProblemStartingPhp(Exception):
         self.file_name = file_name
         self.line_num = line_num
 
+class PhpshConfig:
+   def __init__(self):
+       self.config = ConfigParser.RawConfigParser({
+          'Xdebug'          : None,
+          'DebugClient'     : 'emacs',
+          'ClientTimeout'   : 60,
+          'ClientHost'      : 'localhost',
+          'ClientPort'      : None,
+          'ProxyPort'       : None,
+          'Help'            : 'no',
+          'LogDBGp'         : 'no',
+          'ForegroundColor' : 'black',
+          'BackgroundColor' : 'white',
+          'InactiveColor'   : 'grey75',
+          'InactiveMinimize': 'yes',
+          'FontFamily'      : None,
+          'FontSize'        : None})
+       self.config.add_section('Debugging')
+       self.config.add_section('Emacs')
+
+   def read(self):
+       config_files = ['/etc/phpsh/config']
+       home = os.getenv('HOME')
+       if home:
+          homestr = home.strip()
+          if homestr:
+             config_files.append(os.path.join(homestr, ".phpsh/config"))
+       self.config.read(config_files)
+       return self.config
+
+   def get_option(self, s, o):
+      if self.config.has_option(s, o):
+         return self.config.get(s, o)
+      else:
+         return None
+
 class PhpshState:
     """This doesn't perfectly encapsulate state (e.g. the readline module has
     global state), but it is a step in the
@@ -159,19 +207,16 @@ class PhpshState:
     quit_command = "quit_command"
 
     def __init__(self, cmd_incs, do_color, do_echo, codebase_mode,
-            do_autocomplete, do_ctags, interactive):
+            do_autocomplete, do_ctags, interactive, with_xdebug):
         """start phpsh.php and do other preparations (colors, ctags)
         """
 
         self.do_echo = do_echo
+        self.p_dbgp = None; # debugging proxy
+        self.dbgp_port = 9000; # default port on which dbgp proxy listens
         self.temp_file_name = tempfile.mktemp()
-        self.comm_base = "php " + self.phpsh_root + "/phpsh.php " + \
-            self.temp_file_name + " " + cu.arg_esc(codebase_mode)
-        if not do_color:
-            self.comm_base += " -c"
-        if not do_autocomplete:
-            self.comm_base += " -A"
-        self.cmd_incs = cmd_incs
+        self.with_xdebug = with_xdebug;
+        self.xdebug_path = None # path to xdebug.so read from config file
 
         # so many colors, so much awesome
         if not do_color:
@@ -186,6 +231,72 @@ class PhpshState:
             self.clr_help = clr.Green
             self.clr_announce = clr.Magenta
             self.clr_default = clr.Default
+
+        self.config = PhpshConfig()
+        try:
+           self.config.read()
+        except Exception, msg:
+           self.print_error("Failed to load config file, using default "\
+                            "settings: " + str(msg))
+           self.config = PhpshConfig()
+        if self.with_xdebug:
+           xdebug = self.config.get_option('Debugging', 'Xdebug')
+           if xdebug:
+              if xdebug == 'no':
+                 self.with_xdebug = False
+              else:
+                 self.xdebug_path = xdebug
+
+        self.comm_base = "php "
+
+        if self.with_xdebug:
+           xdebug_comm_base = self.comm_base
+           php_ext_dir = get_php_ext_path()
+           if php_ext_dir:
+              if not self.xdebug_path:
+                 self.xdebug_path = php_ext_dir + "/xdebug.so"
+              try:
+                 os.stat(self.xdebug_path)
+                 xdebug_comm_base += " -d \'zend_extension"
+                 if php_ext_dir.find("php/extensions/debug") >= 0:
+                    xdebug_comm_base += "_debug"
+                 xdebug_comm_base += "=\"" + self.xdebug_path + "\"\' "
+                 # The following is a workaround for role.ini being overly
+                 # restrictive. role.ini currently sets max nesting level to 50
+                 xdebug_comm_base += "-d xdebug.max_nesting_level=500 "
+                 try:
+                    xdebug_version = self.get_xdebug_version(xdebug_comm_base)
+                    if  xdebug_version < [2, 0, 3]:
+                       self.print_error("Xdebug version " + str(xdebug_version)
+                         + " is too low. xdebug-2.0.3 or above required.\nPHP "
+                         + "debugging will be disabled")
+                       self.with_xdebug = False
+                 except Exception, msg:
+                    self.print_error("Could not detect Xdebug version.\nPHP "
+                         + "debugging will be disabled")
+                    self.with_xdebug = False
+              except OSError:
+                 self.print_error("Path to xdebug.so: " + self.xdebug_path +\
+                                  " not found\nPHP debugging will be disabled")
+                 self.with_xdebug = False
+                 self.xdebug_path = None
+           else:
+              self.print_error("Could not identify PHP extensions directory\n"
+                               "PHP debugging will be disabled")
+              self.with_xdebug = False
+              self.xdebug_path = None
+
+        if self.with_xdebug:
+           self.comm_base = xdebug_comm_base
+           self.start_xdebug_proxy()
+
+        self.comm_base += self.phpsh_root + "/phpsh.php " + \
+            self.temp_file_name + " " + cu.arg_esc(codebase_mode)
+        if not do_color:
+            self.comm_base += " -c"
+        if not do_autocomplete:
+            self.comm_base += " -A"
+        self.cmd_incs = cmd_incs
 
         # ctags integration
         self.ctags = None
@@ -265,6 +376,56 @@ class PhpshState:
                 "type 'h' or 'help' to see instructions & features" + \
                 self.clr_default
 
+    def get_xdebug_version(self, comm_base):
+       vline = Popen(comm_base + " -r 'phpinfo();' |"\
+                     " grep '^ *with Xdebug v[0-9][0-9.]*'",
+                     shell=True, stdout=PIPE).communicate()[0]
+       if not vline:
+          raise Exception, \
+                "Could not find \"with Xdebug\" in phpinfo() output"
+       m = re.compile(" *with Xdebug v([0-9.]+)").match(vline)
+       if not m:
+          raise Exception, \
+                "Could not find xdebug version number in phpinfo() output"
+       try:
+          return [int(s) for s in m.group(1).split('.')]
+       except ValueError:
+          raise ValueError, "invalid Xdebug version format: " + m.group(1)
+
+    def start_xdebug_proxy(self):
+       try:
+          dbgp_py = os.path.join(self.phpsh_root, "dbgp.py")
+          self.p_dbgp = Popen(dbgp_py, stdin=PIPE, stdout=PIPE)
+          try:
+             dbgp_status = self.p_dbgp.stdout.readline()
+             if dbgp_status.startswith("initialized"):
+                r = re.compile('.*port=([0-9]+).*')
+                m = r.match(dbgp_status)
+                if m:
+                   self.dbgp_port = m.group(1)
+             else:
+                self.print_error("xdebug proxy failed to initialize\n" + \
+                                 "PHP debugging will be disabled: " + \
+                                 dbgp_status)
+                self.p_dbgp.stdin.close()
+                self.p_dbgp = None
+                self.with_xdebug = False
+          except Exception, msg:
+             self.print_error("Could not obtain initialization status "\
+                              "from xdebug proxy\nPHP debugging will be "\
+                              "disabled: " + str(msg))
+             self.p_dbgp.stdin.close()
+             self.p_dbgp = None
+             self.with_xdebug = False
+       except Exception, msg:
+          self.print_error("Failed to start xdebug proxy\n"\
+                           "PHP debugging will be disabled: " + str(msg))
+          self.with_xdebug = False
+
+
+    def print_error(self, msg):
+       print self.clr_err + msg + self.clr_default
+
     def do_expr(self, expr):
         self.p.stdin.write(expr)
         self.wait_for_comm_finish()
@@ -300,6 +461,10 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
         self.wait_for_comm_finish()
 
     def php_restart(self):
+        if self.with_xdebug and self.p_dbgp:
+           self.p_dbgp.stdin.write("run php\n")
+           self.p_dbgp.stdin.flush()
+
         self.initialized_successfully = False
         try:
             self.p.stdout.close()
@@ -314,8 +479,16 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
     def php_open(self):
         self.autocomplete_identifiers = []
         cmd = " ".join([self.comm_base] + list(self.cmd_incs))
+        if self.with_xdebug:
+           os.putenv("XDEBUG_CONFIG", "remote_port="+str(self.dbgp_port)+
+                     " remote_enable=1");
         self.p = Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE,
             preexec_fn=os.setsid)
+        if self.with_xdebug:
+           # disable remote debugging for other instances of php started by
+           # this script, such as the multiline syntax verifyer
+           os.putenv("XDEBUG_CONFIG", "remote_enable=0");
+
         p_line = self.p.stdout.readline().rstrip()
         if p_line != "#start_autocomplete_identifiers":
             err_lines = self.p.stderr.readlines();
@@ -510,6 +683,50 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
         else:
             return self.no_command
         return self.yes_command
+
+
+    # check if line is of the form "x =?<function-name>(<args>?)"
+    # if it is, send it to the DBGp proxy and return the function call string
+    # otherwise return None
+    def try_debug_funcall(self, line):
+       if not line.startswith("x "):
+          return
+       if not self.with_xdebug or not self.p_dbgp:
+          self.print_error("PHP debugging is disabled")
+          return self.yes_command
+       # extract function name and optional leading '=' from line
+       funcall = line[2:].strip()
+       if funcall.startswith("="):
+          doreturn = True
+          funcall = funcall[1:]
+       else:
+          doreturn = False
+       paren = funcall.find("(");
+       if paren <= 0:
+          self.print_error("Invalid function call syntax")
+          return self.yes_command
+       dbgp_cmd = "x " + funcall[:paren].strip()
+       try:
+          self.p_dbgp.stdin.write(dbgp_cmd+'\n')
+          self.p_dbgp.stdin.flush()
+          # TODO: put a timeout on this:
+          dbgp_reply = self.p_dbgp.stdout.readline()
+          if dbgp_reply != "ready\n":
+             self.print_error("xdebug proxy error: " + dbgp_reply)
+             return self.yes_command
+       except Exception, msg:
+          self.print_error("Failed to communicate with xdebug proxy, "\
+                           "disabling PHP debugging: " + str(msg))
+          self.p_dbgp.stdin.close()
+          self.with_xdebug = False
+          return self.yes_command
+       # return PHP code to pass to PHP for eval
+       phpcode = "xdebug_break(); "
+       if doreturn:
+          phpcode += "return "
+       phpcode += funcall
+       return phpcode
+
 
     def editor_tag(self, tag, editor, read_only=False):
         if tag.startswith("$"):
