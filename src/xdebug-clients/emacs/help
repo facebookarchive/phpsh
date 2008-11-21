@@ -1,0 +1,24 @@
+[GEBEN commands]
+
+Execution:
+ g     run
+ i     step into
+ o     step over
+ r     step out
+ q     stop debugging
+
+Breakpoints:
+ b     set breakpoint on current line
+ B     set breakpoint at specified function or exception
+ u     delete breakpoint on current line
+
+Examining and changing variables:
+ e     eval a PHP expression, prints to *Messages* buffer
+
+Stack:
+ d     print stack trace, move up and down
+ w     go to current line
+ v     view locals and superglobals
+
+Help:
+ ?     geben mode help
