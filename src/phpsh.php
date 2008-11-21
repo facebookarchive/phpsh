@@ -146,6 +146,7 @@ class ___PHPShell___ {
     print "#end_autocomplete_identifiers\n";
   }
 
+
   /**
    * The main interactive loop
    *
@@ -182,6 +183,8 @@ class ___PHPShell___ {
         $evalue = null;
       }
 
+      PHPShell__eval_completed();
+
       // if any value was returned by the evaluated code, print it
       if (isset($evalue)) {
         if ($do_color) {
@@ -206,3 +209,10 @@ class ___PHPShell___ {
     }
   }
 }
+
+//This function is here just so that the debug proxy can set a
+//breakpoint on something that executes right after the function being
+//debugged has been evaluated. Hitting this breakpoint makes debug
+//proxy remove the breakpoint it previously set on the function under
+//debugging.
+function PHPShell__eval_completed() { }
