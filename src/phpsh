@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 
-__version__ = "1.1"
+__version__ = "1.2"
 __author__ = "phpsh@facebook.com"
-__date__ = "Sep 29, 2008"
+__date__ = "Nov 20, 2008"
 
 from optparse import OptionParser
 from phpsh import PhpshState, PhpMultiliner, do_sugar, line_encode
 import sys
+import os
 
 usage = """~/www> phpsh [options] [extra-includes]
 phpsh is an interactive shell into a php codebase."""
@@ -17,11 +18,14 @@ See /etc/phpsh/phpshrc.php for other codebase modes.""")
 p.add_option("-t", "--test-file",
     help="""Run a saved-phpsh-session unit test file.
 See test/ in the phpsh distribution for examples.""")
+
 # are we cool with these negated opts?  at least they indicate the defaults..
 p.add_option("-A", "--no-autocomplete", action="store_true")
 p.add_option("-C", "--no-color", action="store_true")
 p.add_option("-M", "--no-multiline", action="store_true")
 p.add_option("-T", "--no-ctags", action="store_true")
+p.add_option("-X", "--no-xdebug", action="store_true",
+             help="Disable PHP debugging with xdebug.")
 (opts, cmd_incs) = p.parse_args()
 
 # default codebase_mode is "" (don't want None)
@@ -34,7 +38,7 @@ s = PhpshState(cmd_incs=set(cmd_incs),
     do_color=not opts.no_color and not opts.test_file,
     do_echo=not opts.test_file, codebase_mode=opts.codebase_mode,
     do_autocomplete=not opts.no_autocomplete, do_ctags=not opts.no_ctags,
-    interactive=not opts.test_file)
+    interactive=not opts.test_file, with_xdebug=not opts.no_xdebug)
 
 if opts.test_file:
     # TODO support multiline in test-mode
@@ -111,14 +115,23 @@ while True:
             m.clear()
         new_expr = True
         continue
+    funcall = None
     if new_expr:
         t_c_ret = s.try_command(line)
         if t_c_ret == PhpshState.quit_command:
             break
         elif t_c_ret == PhpshState.yes_command:
             continue
+        funcall = s.try_debug_funcall(line)
+        if funcall:
+            if funcall == PhpshState.yes_command:
+                #line is recognized as an "x" command, but debugging cannot
+                #be started
+                continue
+            else:
+                line = funcall
     line_ready = None
-    if do_multiline:
+    if do_multiline and not funcall:
         (m_res, m_str) = m.input_line(line)
         if m_res == PhpMultiliner.complete:
             line_ready = m_str
