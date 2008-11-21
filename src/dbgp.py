@@ -473,7 +473,7 @@ class PhpshDebugProxy:
         """Returns a list containing a shell command to start and
         configure emacs according to the settings in phpsh config file"""
         phpsh_root = os.path.dirname(os.path.realpath(__file__))
-        elisp_root = os.path.join(phpsh_root, "xdebug-clients/emacs")
+        elisp_root = os.path.join(phpsh_root, "xdebug-clients/geben")
         geben_elc = os.path.join(elisp_root, "geben.elc")
         phpsh_el = os.path.join(phpsh_root, "phpsh.el")
         help = os.path.join(elisp_root, "help")
