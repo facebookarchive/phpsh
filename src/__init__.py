@@ -169,7 +169,8 @@ class PhpshConfig:
           'InactiveColor'   : 'grey75',
           'InactiveMinimize': 'yes',
           'FontFamily'      : None,
-          'FontSize'        : None})
+          'FontSize'        : None,
+          'XdebugClientPath': 'debugclient'})
        self.config.add_section('Debugging')
        self.config.add_section('Emacs')
 

@@ -1,11 +1,11 @@
 [Debugging]
 
 #Xdebug: /path/to/xdebug.so
-#  Location of Zend debugging extension. You should probably leave this 
-#  unset. If left unset phpsh will use xdebug.so installed in the extensions
-#  directory reported by php-config. Set to "no" (without quotes) to disable 
-#  loading xdebug into php VM. This will disable all debugging support in phpsh
-#  and is equivalent to passing -X to phpsh on the command line.
+#  Location of xdebug.so, a debugging extension for the Zend engine. 
+#  You should probably leave this unset. If left unset phpsh will look for
+#  xdebug.so in the extensions directory reported by php-config. 
+#  Set to "no" (without quotes) to disable loading xdebug into php VM. 
+#  This will disable all debugging support.
 
 #DebugClient: emacs
 #  Command to run to start an xdebug client. Default is "emacs", which starts
@@ -71,3 +71,10 @@
 
 #FontSize: 160
 #  Font size in points for default Emacs face. If unset, Emacs defaults are used.
+
+#XdebugClientPath: /path/to/debugclient
+#  Emacs debug client, geben, uses a simple command-line debug client, aptly
+#  called debugclient, a part of xdebug package. This setting controls
+#  the location that Emacs should use to start debugclient. Default is just
+#  to pass "debugclient" to shell.
+

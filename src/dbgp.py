@@ -124,15 +124,32 @@ def get_emacs_version():
     vline = Popen("emacs --version | head -n 1", shell=True,
                   stdout=PIPE).communicate()[0]
     if not vline:
-        raise OSError, "emacs not found"
+        raise OSError, "emacs not found. Make sure it's in your PATH."
     m = re.compile("GNU Emacs ([0-9.]+)").match(vline)
     if not m:
         raise ValueError, "could not parse emacs version: " + vline +\
-                          "expected GNU Emacs [0-9.]+"
+                          "\nexpected GNU Emacs [0-9.]+"
     try:
         return [int(s) for s in m.group(1).split('.')]
     except ValueError:
         raise ValueError, "invalid Emacs version format: " + m.group(1)
+
+
+def get_debugclient_version(debugclient_path):
+    vline = Popen(debugclient_path + " -v | head -n 1", shell=True,
+                  stdout=PIPE).communicate()[0]
+    if not vline:
+        raise OSError, "debugclient not found\nThis is a simple xdebug "\
+              "protocol client distributed with xdebug\n"\
+              "Make sure it's in your PATH."
+    m = re.compile("Xdebug Simple DBGp client \(([0-9.]+)\)").match(vline)
+    if not m:
+        raise ValueError, "could not parse debugclient version: " + vline +\
+              "\nexpected Xdebug Simple DBGp client ([0-9.]+)"
+    try:
+        return [int(s) for s in m.group(1).split('.')]
+    except ValueError:
+        raise ValueError, "invalid debugclient version format: " + m.group(1)
 
 
 class DebugClient:
@@ -167,7 +184,7 @@ class DebugClient:
                 # to start a client. Propagate exception.
                 raise socket.error, msg
             if not os.getenv('DISPLAY'):
-                raise Exception, "need X11 and DISPLAY is not set"
+                raise Exception, "X11 is required and DISPLAY is not set"
             # client is local, X display is set, try to start it
             self.p_client = Popen(self.cmd, close_fds=True)
             sock.settimeout(self.timeout)
@@ -457,6 +474,12 @@ class PhpshDebugProxy:
             if emacs_version < [22, 1]:
                 raise Exception, "emacs version " + str(emacs_version) +\
                                  " is too low, 22.1 or above required"
+            debugclient_path = config.get_option("Emacs", "XdebugClientPath")
+            debugclient_version = get_debugclient_version(debugclient_path)
+            if debugclient_version < [0, 10, 0]:
+                raise Exception, "debugclient (xdebug client) version " +\
+                      str(debugclient_version) + " is too low. 0.10.0 or "\
+                      "above required"
             self.cmd = self.emacs_command()
         else:
             self.cmd = shlex.split(cmd)
@@ -482,12 +505,13 @@ class PhpshDebugProxy:
         ina = self.config.get_option("Emacs", "InactiveColor")
         family = self.config.get_option("Emacs", "FontFamily")
         size = self.config.get_option("Emacs", "FontSize")
+        debugclient_path = config.get_option("Emacs", "XdebugClientPath")
 
         elisp = "(progn (set-face-foreground 'default \""+fg+"\") "+\
                 "(setq active-bg \""+bg+"\") "+\
                 "(setq inactive-bg \""+ina+"\") "\
-                "(setq geben-dbgp-command-line \"debugclient "\
-                            "-p "+str(self.clientport)+"\") "
+                "(setq geben-dbgp-command-line \""+debugclient_path+\
+                            " -p "+str(self.clientport)+"\") "
         if family or size:
             elisp += "(set-face-attribute 'default nil"
             if family:
