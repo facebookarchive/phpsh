@@ -30,8 +30,7 @@ directly without reinstalling.  E.g.:
   ~ cd ~/www
   ~ ~/projects/phpsh/src/phpsh
 
-Todo for after phpsh 1.1
-- Simple phpsh breakpoints that you can insert into your php code.
+Todo for after phpsh 1.2
 - Maybe phpsh_check_syntax shouldn't actually be installed as a script, and
   just be a pkg_resource?  Didn't want to worry about zip file overhead, and
   installing didn't seem like a big deal.

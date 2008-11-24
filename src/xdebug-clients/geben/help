@@ -22,3 +22,6 @@ Stack:
 
 Help:
  ?     geben mode help
+
+To disable displaying this help screen set Help option in the [Emacs] 
+section of your ~/.phpsh/config file to "no".

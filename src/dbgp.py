@@ -528,6 +528,9 @@ class PhpshDebugProxy:
             elisp += "(split-window) "\
                      "(find-file-read-only \""+help+"\") "\
                      "(other-window 1) "
+        else:
+            elisp += "(find-file-read-only \""+help+"\") "\
+                     "(switch-to-buffer \"*scratch*\") "
         elisp += ")"
 
         return ["emacs", "--name", "phpsh-emacs", "-Q", "-l", geben_elc,

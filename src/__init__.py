@@ -702,11 +702,11 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
           funcall = funcall[1:]
        else:
           doreturn = False
-       paren = funcall.find("(");
-       if paren <= 0:
+       m = re.compile("([A-Za-z_][A-Za-z0-9_]*) *[(]").match(funcall)
+       if not m:
           self.print_error("Invalid function call syntax")
           return self.yes_command
-       dbgp_cmd = "x " + funcall[:paren].strip()
+       dbgp_cmd = "x " + m.group(1)
        try:
           self.p_dbgp.stdin.write(dbgp_cmd+'\n')
           self.p_dbgp.stdin.flush()

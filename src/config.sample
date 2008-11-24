@@ -34,9 +34,8 @@
 #Help: no
 #  This option works only if DebugClient is unset or set to "emacs". If
 #  set to "yes", when emacs starts it will show a help screen for its PHP 
-#  debugging mode. If set to "brief", phpsh will display a short hint on how
-#  to get help on debugging in emacs. If set to "no", no help will be 
-#  displayed. Default is "no".
+#  debugging mode. If set to "no", a help file will be loaded into an Emacs
+#  buffer but will not be displayed on startup. Default is "no".
 
 #LogDBGp: no
 #  If "yes", debug proxy will log DBGp (xdebug protocol) messages to 
