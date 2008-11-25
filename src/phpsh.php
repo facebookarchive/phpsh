@@ -183,7 +183,8 @@ class ___PHPShell___ {
         $evalue = null;
       }
 
-      PHPShell__eval_completed();
+      if ($buffer != "xdebug_break();\n")
+        PHPShell__eval_completed();
 
       // if any value was returned by the evaluated code, print it
       if (isset($evalue)) {

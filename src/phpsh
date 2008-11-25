@@ -100,6 +100,7 @@ if do_multiline:
 
 # main loop
 new_expr = True
+debug_funcall = False
 while True:
     if new_expr:
         prompt = s.php_prompt
@@ -115,23 +116,17 @@ while True:
             m.clear()
         new_expr = True
         continue
-    funcall = None
     if new_expr:
         t_c_ret = s.try_command(line)
         if t_c_ret == PhpshState.quit_command:
             break
         elif t_c_ret == PhpshState.yes_command:
             continue
-        funcall = s.try_debug_funcall(line)
-        if funcall:
-            if funcall == PhpshState.yes_command:
-                #line is recognized as an "x" command, but debugging cannot
-                #be started
-                continue
-            else:
-                line = funcall
+        elif t_c_ret == PhpshState.debug_command:
+            debug_funcall = True
+            line = line[len(PhpshState.debug_command):].lstrip()
     line_ready = None
-    if do_multiline and not funcall:
+    if do_multiline:
         (m_res, m_str) = m.input_line(line)
         if m_res == PhpMultiliner.complete:
             line_ready = m_str
@@ -146,8 +141,14 @@ while True:
     if line_ready != None:
         if line_ready:
             s.write()
-            s.do_expr(line_ready)
+            if debug_funcall:
+                if s.setup_debug_client(line_ready):
+                    s.do_expr("xdebug_break();\n")
+                    s.do_expr(line_ready)
+            else:
+                s.do_expr(line_ready)
         new_expr = True
+        debug_funcall = False
     else:
         new_expr = False
 s.close()

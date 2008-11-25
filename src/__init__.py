@@ -206,6 +206,7 @@ class PhpshState:
     no_command = "no_command"
     yes_command = "yes_command"
     quit_command = "quit_command"
+    debug_command = "x "
 
     def __init__(self, cmd_incs, do_color, do_echo, codebase_mode,
             do_autocomplete, do_ctags, interactive, with_xdebug):
@@ -289,7 +290,10 @@ class PhpshState:
 
         if self.with_xdebug:
            self.comm_base = xdebug_comm_base
+           #DEBUG:
            self.start_xdebug_proxy()
+           #self.dbgp_port = self.config.get_option("Debugging", "ProxyPort")
+           #end DEBUG
 
         self.comm_base += self.phpsh_root + "/phpsh.php " + \
             self.temp_file_name + " " + cu.arg_esc(codebase_mode)
@@ -674,6 +678,12 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
             self.editor_tag(line[2:], "vim")
         elif line.startswith("e "):
             self.editor_tag(line[2:], "emacs")
+        elif line.startswith("x "):
+           if self.with_xdebug and self.p_dbgp:
+              return PhpshState.debug_command
+           else:
+              self.print_error("PHP debugging is disabled")
+              return PhpshState.yes_command
         elif line.startswith("!"):
             # shell command
             Popen(line[1:], shell=True).wait()
@@ -686,26 +696,18 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
         return self.yes_command
 
 
-    # check if line is of the form "x =?<function-name>(<args>?)"
-    # if it is, send it to the DBGp proxy and return the function call string
-    # otherwise return None
-    def try_debug_funcall(self, line):
-       if not line.startswith("x "):
-          return
-       if not self.with_xdebug or not self.p_dbgp:
-          self.print_error("PHP debugging is disabled")
-          return self.yes_command
+    # check if line is of the form "=?<function-name>(<args>?)"
+    # if it is, send it to the DBGp proxy and if the proxy reports
+    # that it is ready to start debugging, return True. Otherwise
+    # return False.
+    def setup_debug_client(self, funcall):
        # extract function name and optional leading '=' from line
-       funcall = line[2:].strip()
-       if funcall.startswith("="):
-          doreturn = True
-          funcall = funcall[1:]
-       else:
-          doreturn = False
-       m = re.compile("([A-Za-z_][A-Za-z0-9_]*) *[(]").match(funcall)
+       if funcall.startswith("return "):
+          funcall = funcall[6:].lstrip()
+       m = re.compile(" *([A-Za-z_][A-Za-z0-9_]*) *[(]").match(funcall)
        if not m:
           self.print_error("Invalid function call syntax")
-          return self.yes_command
+          return False
        dbgp_cmd = "x " + m.group(1)
        try:
           self.p_dbgp.stdin.write(dbgp_cmd+'\n')
@@ -714,19 +716,15 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
           dbgp_reply = self.p_dbgp.stdout.readline()
           if dbgp_reply != "ready\n":
              self.print_error("xdebug proxy error: " + dbgp_reply)
-             return self.yes_command
+             return False
        except Exception, msg:
           self.print_error("Failed to communicate with xdebug proxy, "\
                            "disabling PHP debugging: " + str(msg))
           self.p_dbgp.stdin.close()
           self.with_xdebug = False
-          return self.yes_command
+          return False
        # return PHP code to pass to PHP for eval
-       phpcode = "xdebug_break(); "
-       if doreturn:
-          phpcode += "return "
-       phpcode += funcall
-       return phpcode
+       return True
 
 
     def editor_tag(self, tag, editor, read_only=False):

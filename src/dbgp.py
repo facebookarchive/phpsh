@@ -160,6 +160,8 @@ class DebugClient:
         self.conn = None     # DBGpConn to client
         self.lasttxid = None     # last txid seen from this client
         self.lastdbgpcmd = None  # name of last command read from client
+        self.stopped = True  # never sent anything to this client, or
+                             # last message was "stopped"
         self.host = host
         self.port = port
         self.cmd = cmd
@@ -212,6 +214,7 @@ class DebugClient:
 
     def send_msg(self, msg):
         self.conn.send_msg(msg)
+        self.stopped = False
 
     def recv_cmd(self):
         cmd = self.conn.recv_cmd()
@@ -228,8 +231,8 @@ class DebugClient:
     def get_sockfd(self):
         return self.conn.get_sockfd()
 
-    def send_stopped(self):
-        if not self.lasttxid or not self.lastdbgpcmd or \
+    def stop(self):
+        if self.stopped or not self.lasttxid or not self.lastdbgpcmd or \
            not self.conn.isconnected():
             return
         stopping = '<?xml version="1.0" encoding="iso-8859-1"?>\n'\
@@ -238,11 +241,12 @@ class DebugClient:
                    'command="'+self.lastdbgpcmd+'" transaction_id="'\
                    +self.lasttxid+'" status="stopped" reason="ok"></response>'
         self.send_msg(stopping)
+        self.stopped = True
 
     def close(self):
         """Close connection to debug client and kill it if we started it"""
         if self.conn and self.conn.isconnected():
-            self.send_stopped()
+            self.stop()
             self.conn.close()
         if self.p_client:
             try:
@@ -361,10 +365,10 @@ class DebugSession:
             reply = self.xdebug.recv_msg()
             filename = dbgp_get_filename(reply)
 
-        if not filename.startswith("file://"):
-            # the function passed to us by phpsh exists, but is not in
-            # our codebase. It is likely a built-in PHP function that
-            # we can't debug.  Abort the session.
+        if not filename.startswith("file://") or \
+           filename.endswith("/phpsh.php"):
+            # Execution stopped at PHPShell__eval_completed() or in the eval().
+            # Abort the session.
             self.client = None
             return
 
@@ -426,7 +430,7 @@ class DebugSession:
         # stop message
         if self.client:
             try:
-                self.client.send_stopped()
+                self.client.stop()
             except (socket.error, EOFError):
                 pass
 
