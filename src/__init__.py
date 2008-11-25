@@ -393,7 +393,7 @@ class PhpshState:
           raise Exception, \
                 "Could not find xdebug version number in phpinfo() output"
        try:
-          return [int(s) for s in m.group(1).split('.')]
+          return [int(s) for s in m.group(1).strip('.').split('.')]
        except ValueError:
           raise ValueError, "invalid Xdebug version format: " + m.group(1)
 

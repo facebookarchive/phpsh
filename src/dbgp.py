@@ -130,7 +130,7 @@ def get_emacs_version():
         raise ValueError, "could not parse emacs version: " + vline +\
                           "\nexpected GNU Emacs [0-9.]+"
     try:
-        return [int(s) for s in m.group(1).split('.')]
+        return [int(s) for s in m.group(1).strip('.').split('.')]
     except ValueError:
         raise ValueError, "invalid Emacs version format: " + m.group(1)
 
@@ -147,7 +147,7 @@ def get_debugclient_version(debugclient_path):
         raise ValueError, "could not parse debugclient version: " + vline +\
               "\nexpected Xdebug Simple DBGp client ([0-9.]+)"
     try:
-        return [int(s) for s in m.group(1).split('.')]
+        return [int(s) for s in m.group(1).strip('.').split('.')]
     except ValueError:
         raise ValueError, "invalid debugclient version format: " + m.group(1)
 
