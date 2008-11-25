@@ -1,11 +1,11 @@
 [Debugging]
 
 #Xdebug: /path/to/xdebug.so
-#  Location of xdebug.so, a debugging extension for the Zend engine. 
-#  You should probably leave this unset. If left unset phpsh will look for
-#  xdebug.so in the extensions directory reported by php-config. 
-#  Set to "no" (without quotes) to disable loading xdebug into php VM. 
-#  This will disable all debugging support.
+#  Location of xdebug.so, a debugging extension for the Zend
+#  engine. By default phpsh will look for xdebug.so in the extensions
+#  directory reported by php-config. Set to "no" (without quotes) to
+#  disable loading xdebug into php VM. This will disable all debugging
+#  support.
 
 #DebugClient: emacs
 #  Command to run to start an xdebug client. Default is "emacs", which starts
@@ -21,9 +21,8 @@
 #  unless you are running your own debug client. Default is localhost.
 
 #ClientPort: 9001
-#  Leave this unset unless you run your own debug client, such as emacs/geben 
-#  in another terminal without X. If you do run your own client, set this to 
-#  the port on which the debug client listens for xdebug connections
+#  Port on which the debug client listens for xdebug connections. By default
+#  ProxyPort+1 is used.
 
 #ProxyPort: 9000
 #  The port on which the proxy should listen for xdebug connections. If left 
@@ -39,7 +38,7 @@
 
 #LogDBGp: no
 #  If "yes", debug proxy will log DBGp (xdebug protocol) messages to 
-#  file dbgp.log in the directory where phpsh was started. Defaul is "no".
+#  file dbgp.log in the current directory. Defaul is "no".
 
 [Emacs]
 
