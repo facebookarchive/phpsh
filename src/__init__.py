@@ -190,6 +190,18 @@ class PhpshConfig:
       else:
          return None
 
+def until_paren_close_balanced(s):
+    lparens = 1
+    for i in range(len(s)):
+        if s[i] == '(':
+            lparens += 1
+        elif s[i] == ')':
+            lparens -= 1
+        if lparens == 0:
+            return s[:i]
+    return s
+
+
 class PhpshState:
     """This doesn't perfectly encapsulate state (e.g. the readline module has
     global state), but it is a step in the
@@ -331,7 +343,10 @@ class PhpshState:
         # we set the history length to be something reasonable
         # so that we don't write a ridiculously huge file every time
         # someone executes a command
-        self.history_file = os.path.join(os.environ["HOME"], ".phpsh.history")
+        home_phpsh_dir = os.path.join(os.environ["HOME"], ".phpsh")
+        if not os.path.exists(home_phpsh_dir):
+            os.mkdir(home_phpsh_dir)
+        self.history_file = os.path.join(home_phpsh_dir, "history")
         readline.set_history_length(100)
 
         try:
@@ -352,8 +367,7 @@ class PhpshState:
             """The completer function is called as function(text, state),
             for state in 0, 1, 2, ..., until it returns a non-string value."""
 
-            size = len(text)
-            if size == 0:
+            if not text:
                 # currently there is a segfault in readline when you complete
                 # on nothing.  so just don't allow completing on that for now.
                 # in the long term, we may use ipython's prompt code instead
@@ -362,12 +376,28 @@ class PhpshState:
             if state == 0:
                 self.autocomplete_cache = []
                 for identifier in self.autocomplete_identifiers:
-                    if identifier[0:size] == text:
+                    if identifier.startswith(text):
                         self.autocomplete_cache.append(identifier)
 
                 if self.function_signatures.has_key(text):
                     for sig in self.function_signatures[text]:
-                        self.autocomplete_cache.append(sig)
+                        func_str = sig[1]
+                        if func_str[-1] == ',':
+                            file_contents = ''.join(
+                                l[:-1] for l in file(sig[0]).readlines())
+                            # this is not perfect but it should be good enough
+                            look_for = 'function ' + text + '('
+                            i = file_contents.find(look_for)
+                            if i != -1:
+                                i_paren = func_str.find('(')
+                                if i_paren != -1:
+                                    func_str = func_str[:i_paren + 1]
+                                i_end = i + len(look_for)
+                                s = until_paren_close_balanced(
+                                    file_contents[i_end:])
+                                s = re.sub(', +', ', ', s, 1000)
+                                func_str += s + ')'
+                        self.autocomplete_cache.append(func_str)
             try:
                 return self.autocomplete_cache[state]
             except IndexError:

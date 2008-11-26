@@ -10,7 +10,7 @@
 // usage: this is only called from phpsh (the python end), as:
 // phpsh.php <comm-file> <codebase-mode> [-c]
 //
-// use '' for default codebase-mode, define others in phpshrc
+// use '' for default codebase-mode, define others in /etc/phpsh/rc.php
 // -c turns off color
 
 // set the TFBENV to script
@@ -26,11 +26,11 @@ ini_set('memory_limit', ini_get('memory_limit') * 2 . 'M');
 ob_start();
 
 $___phpshell___codebase_mode = $argv[2];
-$___phpshell___homerc = getenv('HOME').'/.phpshrc.php';
+$___phpshell___homerc = getenv('HOME').'/.phpsh/rc.php';
 if (file_exists($___phpshell___homerc)) {
   require_once $___phpshell___homerc;
 } else {
-  require_once '/etc/phpsh/phpshrc.php';
+  require_once '/etc/phpsh/rc.php';
 }
 
 $___phpshell___do_color = true;

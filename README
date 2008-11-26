@@ -1,4 +1,5 @@
 To install:
+(Note that the install currently clobbers any previous /etc/phpsh/rc.php)
 ~ python setup.py build
 ~ sudo python setup.py install
 (Will download and install the pysqlite dependency for you if needed.)
@@ -13,24 +14,29 @@ To set up after install:
   ~ cd ~/www
   ~ ctags -R            # for phpsh ctags integration, recommended
   ~ phpsh lib/init.php  # or some file(s) that load codebase libraries
-- To get autoloading, modify /etc/phpsh/phpshrc.php.  After that it's just:
+- To get autoloading, modify /etc/phpsh/rc.php.  After that it's just:
   ~ cd ~/www
   ~ phpsh
   And for times when you just want vanilla php:
   ~ phpsh -c none
-- For individual configuration, also see phpshrc.example.php in the php
+- For individual configuration, also see rc.example.php in the php
   distribution.
 
 Contact phpsh@facebook.com with any questions.
 
 
 Note to ppl hacking on phpsh:
-- For faster iteration, after installing once, you can run phpsh from src/ 
+- For faster iteration, after installing once, you can run phpsh from src/
 directly without reinstalling.  E.g.:
   ~ cd ~/www
   ~ ~/projects/phpsh/src/phpsh
 
+
 Todo for after phpsh 1.2
+- (A) Simple phpsh breakpoints that you can insert into your php code.
+- (B) magic fatal undoing?
+- Convert from /tmp file to named pipe for 'ready' message passing
+  http://my.opera.com/zomg/blog/2007/08/29/php-and-named-pipes
 - Maybe phpsh_check_syntax shouldn't actually be installed as a script, and
   just be a pkg_resource?  Didn't want to worry about zip file overhead, and
   installing didn't seem like a big deal.
@@ -41,3 +47,23 @@ Todo for after phpsh 1.2
 - Command-line apc for faster php startup for large codebases.
 - Note on php start error to start from codebase place?
 - Make tab to show function signature work with multiline func sigs.
+
+About (A: breakpoints):
+jlindamood has suggested adding
+a very basic debugging facility in which phpsh.php would define some
+function called like phpsh_breakpoint() which you would be able to put
+in your code that would cause the php> to re-happen at that breakpoint
+so that you can investigate whatever state until you issue like a
+phpsh_resume() (or whatever it would be called).
+
+My suspicion is that that can be done pretty easily be having a new
+message type from phpsh.php to phpsh.py.  (Currently there is only the
+'ready' message when phpsh.php is ready to receive a new line of codes
+from phpsh.py.)
+
+About (B: fatal-undoing):
+brent suggested adding
+some kind of katamari-esque memory snapshotting, so that on fatals like
+calling a nonexistent function (which are not catchable in php-land,
+sadly) can be magically recovered from.  I think dweatherford or larry
+would be good to ask about this kind of black magic.

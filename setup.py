@@ -29,9 +29,7 @@ setup(
                             'xdebug-clients/geben/tree-widget/geben/*.png']},
     scripts=['src/phpsh', 'src/phpsh_check_syntax'],
     data_files=[
-        ('/etc/phpsh', ['src/phpshrc.php']),
-        ('/etc/phpsh', ['src/php_manual.db']),
-        ('/etc/phpsh', ['src/config.sample']),
+        ('/etc/phpsh', ['src/rc.php', 'src/php_manual.db', 'src/config.sample']),
         ('/usr/local/man/man1', ['src/doc/phpsh.1']),
     ],
     install_requires=['pysqlite'],
