@@ -84,11 +84,12 @@ def inc_args(s):
 
 def get_php_ext_path():
    extension_dir = Popen("php-config | grep extension-dir",
-                         shell=True, stdout=PIPE).communicate()[0]
-   lbr = extension_dir.find("[")
-   rbr = extension_dir.find("]")
-   if 0 < lbr < rbr:
-      return extension_dir[lbr+1:rbr]
+                         shell=True, stdout=PIPE, stderr=PIPE).communicate()[0]
+   if extension_dir:
+      lbr = extension_dir.find("[")
+      rbr = extension_dir.find("]")
+      if 0 < lbr < rbr:
+         return extension_dir[lbr+1:rbr]
 
 
 class PhpMultiliner:
@@ -221,7 +222,7 @@ class PhpshState:
     debug_command = "x "
 
     def __init__(self, cmd_incs, do_color, do_echo, codebase_mode,
-            do_autocomplete, do_ctags, interactive, with_xdebug):
+            do_autocomplete, do_ctags, interactive, with_xdebug, verbose):
         """start phpsh.php and do other preparations (colors, ctags)
         """
 
@@ -230,7 +231,9 @@ class PhpshState:
         self.dbgp_port = 9000; # default port on which dbgp proxy listens
         self.temp_file_name = tempfile.mktemp()
         self.with_xdebug = with_xdebug;
+        self.verbose = verbose
         self.xdebug_path = None # path to xdebug.so read from config file
+        self.xdebug_disabled_reason = None # why debugging was disabled
 
         # so many colors, so much awesome
         if not do_color:
@@ -255,9 +258,11 @@ class PhpshState:
            self.config = PhpshConfig()
         if self.with_xdebug:
            xdebug = self.config.get_option('Debugging', 'Xdebug')
-           if xdebug:
+           if xdebug and xdebug != "yes":
               if xdebug == 'no':
                  self.with_xdebug = False
+                 self.xdebug_disabled_reason = "Xdebug is set to 'no' in "\
+                                               "config file"
               else:
                  self.xdebug_path = xdebug
 
@@ -281,25 +286,28 @@ class PhpshState:
                  try:
                     xdebug_version = self.get_xdebug_version(xdebug_comm_base)
                     if  xdebug_version < [2, 0, 3]:
-                       self.print_error("Xdebug version " + str(xdebug_version)
-                         + " is too low. xdebug-2.0.3 or above required.\nPHP "
-                         + "debugging will be disabled")
+                       self.xdebug_disabled_reason = "Xdebug version "\
+                        + str(xdebug_version) + " is too low. xdebug-2.0.3 "\
+                        + "or above required."
                        self.with_xdebug = False
                  except Exception, msg:
-                    self.print_error("Could not detect Xdebug version.\nPHP "
-                         + "debugging will be disabled")
+                    self.xdebug_disabled_reason = "Could not detect "\
+                                                  "Xdebug version"
                     self.with_xdebug = False
               except OSError:
-                 self.print_error("Path to xdebug.so: " + self.xdebug_path +\
-                                  " not found\nPHP debugging will be disabled")
+                 self.xdebug_disabled_reason = "xdebug.so not found, tried "\
+                        + self.xdebug_path
                  self.with_xdebug = False
                  self.xdebug_path = None
            else:
-              self.print_error("Could not identify PHP extensions directory\n"
-                               "PHP debugging will be disabled")
+              self.xdebug_disabled_reason = "Could not identify PHP extensions"\
+                                      " directory, is php-config in your PATH?"
               self.with_xdebug = False
               self.xdebug_path = None
-
+           if self.verbose and not self.with_xdebug \
+                and self.xdebug_disabled_reason:
+              self.print_warning("PHP debugging will be disabled: "+\
+                                 self.xdebug_disabled_reason)
         if self.with_xdebug:
            self.comm_base = xdebug_comm_base
            #DEBUG:
@@ -439,27 +447,28 @@ class PhpshState:
                 if m:
                    self.dbgp_port = m.group(1)
              else:
-                self.print_error("xdebug proxy failed to initialize\n" + \
-                                 "PHP debugging will be disabled: " + \
-                                 dbgp_status)
                 self.p_dbgp.stdin.close()
                 self.p_dbgp = None
                 self.with_xdebug = False
+                self.xdebug_disabled_reason = "xdebug proxy " + dbgp_status
           except Exception, msg:
              self.print_error("Could not obtain initialization status "\
-                              "from xdebug proxy\nPHP debugging will be "\
-                              "disabled: " + str(msg))
+                              "from xdebug proxy: " + str(msg))
              self.p_dbgp.stdin.close()
              self.p_dbgp = None
              self.with_xdebug = False
        except Exception, msg:
-          self.print_error("Failed to start xdebug proxy\n"\
-                           "PHP debugging will be disabled: " + str(msg))
+          self.print_error("Failed to start xdebug proxy: " + str(msg))
           self.with_xdebug = False
-
+       if self.verbose and not self.with_xdebug and self.xdebug_disabled_reason:
+          self.print_warning("PHP debugging will be disabled.\n"
+                             + self.xdebug_disabled_reason)
 
     def print_error(self, msg):
        print self.clr_err + msg + self.clr_default
+
+    def print_warning(self, msg):
+       print self.clr_announce + msg + self.clr_default
 
     def do_expr(self, expr):
         self.p.stdin.write(expr)
@@ -712,7 +721,9 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
            if self.with_xdebug and self.p_dbgp:
               return PhpshState.debug_command
            else:
-              self.print_error("PHP debugging is disabled")
+              self.print_warning("PHP debugging is disabled")
+              if self.xdebug_disabled_reason:
+                 self.print_warning(self.xdebug_disabled_reason)
               return PhpshState.yes_command
         elif line.startswith("!"):
             # shell command

@@ -59,6 +59,10 @@ OPTIONS
         Run a saved-phpsh-session unit test file. See test/ in the phpsh 
         distribution for examples.
 
+-v::
+--verbose::
+        Be more verbose, do not defer warnings about missing extensions.
+
 -A::
 --no-autocomplete::
         Disable identifier autocomplete.
@@ -194,11 +198,10 @@ supported:
 ~~~~~~~~~~~
 Xdebug::
     Location of xdebug.so, a debugging extension for the Zend
-    engine. By default phpsh will look for xdebug.so in the
-    extensions directory reported by php-config. Set to "no" (without
-    quotes) to disable loading xdebug into php VM. This will disable
-    all debugging support and will stop all warning messages related
-    to debugging.
+    engine. If set to "yes" (without quoutes) phpsh will look 
+    for xdebug.so in the extensions directory reported by 
+    php-config. Set to "no" to disable loading xdebug into php VM. 
+    This will disable all debugging support. Default is "yes".
 
 DebugClient::
   Command to run to start an xdebug client. Default is "emacs", which starts

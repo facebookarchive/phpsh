@@ -61,6 +61,9 @@ Use "\-c none" to load no codebase\&. See /etc/phpsh/phpshrc\&.php for other cod
 \-t, \-\-test\-file
 Run a saved\-phpsh\-session unit test file\&. See test/ in the phpsh distribution for examples\&.
 .TP
+\-v, \-\-verbose
+Be more verbose, do not defer warnings about missing extensions\&.
+.TP
 \-A, \-\-no\-autocomplete
 Disable identifier autocomplete\&.
 .TP
@@ -145,7 +148,7 @@ The config file consists of sections containing key:value pairs\&. Lines startin
 .SS "[Debugging]"
 .TP
 Xdebug   \&
-Location of xdebug\&.so, a debugging extension for the Zend engine\&. By default phpsh will look for xdebug\&.so in the extensions directory reported by php\-config\&. Set to "no" (without quotes) to disable loading xdebug into php VM\&. This will disable all debugging support and will stop all warning messages related to debugging\&.
+Location of xdebug\&.so, a debugging extension for the Zend engine\&. If set to "yes" (without quoutes) phpsh will look for xdebug\&.so in the extensions directory reported by php\-config\&. Set to "no" to disable loading xdebug into php VM\&. This will disable all debugging support\&. Default is "yes"\&.
 .TP
 DebugClient
 Command to run to start an xdebug client\&. Default is "emacs", which starts emacs under X and loads Geben, an xdebug frontend written in Emacs lisp\&.

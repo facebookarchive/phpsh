@@ -122,7 +122,7 @@ def parse_timeout(timeoutstr):
 
 def get_emacs_version():
     vline = Popen("emacs --version | head -n 1", shell=True,
-                  stdout=PIPE).communicate()[0]
+                  stdout=PIPE, stderr=PIPE).communicate()[0]
     if not vline:
         raise OSError, "emacs not found. Make sure it's in your PATH."
     m = re.compile("GNU Emacs ([0-9.]+)").match(vline)
@@ -137,7 +137,7 @@ def get_emacs_version():
 
 def get_debugclient_version(debugclient_path):
     vline = Popen(debugclient_path + " -v | head -n 1", shell=True,
-                  stdout=PIPE).communicate()[0]
+                  stdout=PIPE, stderr=PIPE).communicate()[0]
     if not vline:
         raise OSError, "debugclient not found\nThis is a simple xdebug "\
               "protocol client distributed with xdebug\n"\
