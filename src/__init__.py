@@ -94,8 +94,7 @@ def get_php_ext_path():
 
 class PhpMultiliner:
     """This encapsulates the process and state of intaking multiple input lines
-    until a complete php expression is formed, or (hopefully eventually..)
-    detecting a syntax error.
+    until a complete php expression is formed, or detecting a syntax error.
 
     Note: this is not perfectly encapsulated while the parser has global state
     """
