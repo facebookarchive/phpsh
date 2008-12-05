@@ -91,6 +91,9 @@ def get_php_ext_path():
       if 0 < lbr < rbr:
          return extension_dir[lbr+1:rbr]
 
+def sigalrm_handler(sig, frame):
+   raise OSError, "Alarm"
+
 
 class PhpMultiliner:
     """This encapsulates the process and state of intaking multiple input lines
@@ -514,8 +517,9 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
             self.p.stderr.close()
             self.p.stdin.close()
             self.p.wait()
-        except IOError:
-            pass
+        except (IOError, KeyboardInterrupt):
+           os.kill(self.p.pid, signal.SIGKILL)
+           self.p.wait() # collect the zombie
 
         return self.php_open_and_check()
 
@@ -830,3 +834,14 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
         self.write()
         print self.clr_default
         os.remove(self.temp_file_name)
+        # shutdown php, if it doesn't exit in 5s, kill -9
+        signal.signal(signal.SIGALRM, sigalrm_handler)
+        try:
+            self.p.stdout.close()
+            self.p.stderr.close()
+            self.p.stdin.close()
+            signal.alarm(5)
+            self.p.wait()
+        except (IOError, OSError, KeyboardInterrupt):
+           os.kill(self.p.pid, signal.SIGKILL)
+           self.p.wait() # collect the zombie
