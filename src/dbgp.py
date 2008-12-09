@@ -188,6 +188,7 @@ class DebugClient:
             if not os.getenv('DISPLAY'):
                 raise Exception, "X11 is required and DISPLAY is not set"
             # client is local, X display is set, try to start it
+            debug_log("Starting client: " + " ".join(self.cmd))
             self.p_client = Popen(self.cmd, close_fds=True)
             sock.settimeout(self.timeout)
             tstart = time.time()
@@ -200,12 +201,11 @@ class DebugClient:
                     # failed to connect, likely client is not up yet
                     # keep trying
                     if self.timeout and time.time() - tstart > self.timeout:
-                        debug_log(client_init_error_msg % (self.timeout,
-                                                           self.port,
-                                                           self.cmd))
+                        debug_log("Timed out while waiting "\
+                                  "for debug client to come up")
                         self.close()
-                        raise socket.timeout, \
-                              client_init_error_msg % (self.timeout, self.cmd)
+                        raise socket.timeout, "Timed out while waiting "\
+                              "for debug client to come up"
                     time.sleep(1)
         self.conn = DBGpConn(sock)
 
