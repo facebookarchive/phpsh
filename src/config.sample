@@ -22,13 +22,25 @@
 
 #ClientPort: 9001
 #  Port on which the debug client listens for xdebug connections. By default
-#  ProxyPort+1 is used.
+#  ProxyPort+1 is used. Phpsh always tries to connect to this port on 
+#  ClientHost before launching a debug client. If connection is accepted, 
+#  phpsh assumes that an externally launched debug client is already running 
+#  and does not start its own client.
 
 #ProxyPort: 9000
 #  The port on which the proxy should listen for xdebug connections. If left 
 #  unset the proxy will use the lowest available even-numbered port between 
 #  9002 and 9998. If DebugClient is also unset or set to "emacs", the proxy 
 #  will configure emacs to listen on the next port up.
+
+#X11: yes
+#  If set to "yes", phpsh looks at the value of DISPLAY variable to determine 
+#  how it should start debug client, such as Emacs. If DISPLAY is set, debug
+#  client is started in a separate X window, otherwise it is started without 
+#  X support in the terminal where phpsh is running. If this option is set to 
+#  "no", debug client will always be started in the terminal. If set to 
+#  "require", debug client will not be started unless DISPLAY is set. Default 
+#  is "yes".
 
 #Help: no
 #  This option works only if DebugClient is unset or set to "emacs". If
@@ -75,4 +87,3 @@
 #  called debugclient, a part of xdebug package. This setting controls
 #  the location that Emacs should use to start debugclient. Default is just
 #  to pass "debugclient" to shell.
-

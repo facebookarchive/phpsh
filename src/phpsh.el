@@ -1,6 +1,3 @@
-;open all files read-only
-;(add-hook 'find-file-hook '(lambda () (setq buffer-read-only t)))
-
 ;do not split the window when loading files in geben
 (setq geben-display-window-function 'switch-to-buffer)
 
@@ -10,17 +7,21 @@
         (make-frame-visible frame)
       nil)))
 
-(add-hook 'geben-session-starting-hook
+(if window-system
+    (progn
+      (add-hook 'geben-session-starting-hook
           '(lambda ()
              (set-face-background 'default active-bg)
              (set-face-background 'fringe "grey75")
              (set-face-foreground 'fringe "magenta")))
-
-(add-hook 'geben-session-finished-hook
+      (add-hook 'geben-session-finished-hook
           '(lambda ()
              (set-face-background 'default inactive-bg)
              (set-face-background 'fringe inactive-bg)
-             (set-face-foreground 'fringe inactive-bg)))
+             (set-face-foreground 'fringe inactive-bg))))
+    (add-hook 'geben-session-finished-hook
+              '(lambda ()
+                 (kill-emacs))))
 
 (setq blink-matching-paren t)
 (setq blink-matching-paren-on-screen t)

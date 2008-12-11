@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-from subprocess import Popen, PIPE
 from select import poll, POLLIN, POLLHUP
-from signal import SIGKILL
+from subprocess import Popen, PIPE
 from phpsh import PhpshConfig
 import xml.dom.minidom
+import signal
 import socket
 import shlex
 import time
@@ -14,13 +14,13 @@ import os
 
 """This is a DBGp xdebug protocol proxy started by phpsh. It accepts a
 connection from xdebug, connects to an IDE debug client and
-communicates with its parent phpsh over stdin/out."""
+communicates with its parent phpsh over a pair of pipes."""
 
 __version__ = "1.0"
 __author__ = "march@facebook.com"
 __date__ = "Nov 05, 2008"
 
-usage = "dbgp.py"
+usage = "dbgp.py <4-pipe-fds>"
 
 client_init_error_msg = """
 Timed out while waiting for debug client for %ds. Make sure the client is
@@ -39,24 +39,6 @@ def debug_log(s):
         logfile.write('\n>>>>>>>>>>>>>>>>>>>>>>>\n\n')
     logfile.write(s+'\n\n')
     logfile.flush()
-
-
-def stdin_closed():
-    """Return True if stdin has HUP condition"""
-    evset = poll()
-    evset.register(0, POLLIN|POLLHUP)
-    events = evset.poll(0)
-    if events:
-        fd, e = events[0]
-        if e & POLLHUP:
-            debug_log("stdin_closed(): detected HUP")
-            return True
-    return False
-
-
-def flush_stdout(str):
-    print str
-    sys.stdout.flush()
 
 
 def dbgp_get_filename(dbgp_response):
@@ -174,6 +156,7 @@ class DebugClient:
         execute cmd and try to connect again until timeout. Raises
         socket.timeout if client is not up until timeout, OSError if
         client could not be started"""
+        global config
         if self.conn and self.conn.isconnected():
             return # already connected
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -185,7 +168,8 @@ class DebugClient:
                 # could not connect and client is not local or no command
                 # to start a client. Propagate exception.
                 raise socket.error, msg
-            if not os.getenv('DISPLAY'):
+            x11 = config.get_option("Debugging", "X11")
+            if x11 and x11.startswith("require") and not os.getenv('DISPLAY'):
                 raise Exception, "X11 is required and DISPLAY is not set"
             # client is local, X display is set, try to start it
             debug_log("Starting client: " + " ".join(self.cmd))
@@ -250,7 +234,7 @@ class DebugClient:
             self.conn.close()
         if self.p_client:
             try:
-                os.kill(self.p_client.pid, SIGKILL)
+                os.kill(self.p_client.pid, signal.SIGKILL)
             except OSError:
                 pass
             self.p_client = None
@@ -341,7 +325,7 @@ class DebugSession:
     """This class encapsulates the process of debugging a single
     function"""
 
-    def __init__(self, function, client, xdebug):
+    def __init__(self, function, client, xdebug, p_in):
         self.client = client
         self.clienthost = client.host
         self.clientport = client.port
@@ -350,6 +334,7 @@ class DebugSession:
         self.function = function
         self.funbp = None # breakpoint id for .function
         self.donebp = None # breakpoint id for PHPShell__eval_completed()
+        self.p_in = p_in  # file encapsulating "from parent" pipe end
 
     def run(self):
         # xdebug must be in 'break' state here
@@ -390,13 +375,14 @@ class DebugSession:
         session_set = poll()
         session_set.register(self.client.get_sockfd(), POLLIN)
         session_set.register(self.xdebug.get_sockfd(), POLLIN)
-        session_set.register(0, POLLIN|POLLHUP)
+        session_set.register(self.p_in.fileno(), POLLIN|POLLHUP)
 
         while True:
             events = session_set.poll()
             for fd, e in events:
-                if fd == 0:
-                    phpsh_cmd = raw_input()
+                if fd == self.p_in.fileno():
+                    phpsh_cmd = self.p_in.readline()
+                    phpsh_cmd.strip()
                     if phpsh_cmd == 'run php':
                         # phpsh wants to restart php
                         # if php is blocked in xdebug, send a run command
@@ -440,19 +426,21 @@ class PhpshDebugProxy:
     extension in PHP interpreter and a GUI debug client such as
     Geben/Emacs and alters the conversation in a way that makes the
     debugger and client begin debugging on a function specified through
-    commands that the proxy reads from stdin"""
+    commands that the proxy reads from g_in"""
 
     # if doing dynamic port assignment, pick ports from this range:
     minport = 9002
     maxport = 9998
 
-    def __init__(self, config):
+    def __init__(self, config, p_in, p_out):
         self.config = config # RawConfigParser
         self.cmd = None      # Popen command list to start client if local
         self.client = None   # DebugClient
         self.xdebug = None   # XDebug
         self.session = None  # DebugSession
         self.s_accept = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.p_in = p_in   # file encapsulating a pipe from parent
+        self.p_out = p_out # file encapsulating a pipe to parent
 
         # host on which client runs:
         self.clienthost = config.get_option("Debugging", "ClientHost")
@@ -493,7 +481,24 @@ class PhpshDebugProxy:
 
         # tell parent we have initialized
         debug_log("initialized, bound to port " + str(listenport))
-        flush_stdout('initialized port='+ str(listenport))
+        self.tell_parent('initialized port='+ str(listenport))
+
+
+    def parent_closed(self):
+        """Return True if 'from parent' pipe has HUP condition"""
+        evset = poll()
+        evset.register(self.p_in.fileno(), POLLIN|POLLHUP)
+        events = evset.poll(0)
+        if events:
+            fd, e = events[0]
+            if e & POLLHUP:
+                debug_log("parent_closed(): detected HUP")
+                return True
+            return False
+
+    def tell_parent(self, str):
+        self.p_out.write(str+'\n')
+        self.p_out.flush()
 
 
     def emacs_command(self):
@@ -504,30 +509,39 @@ class PhpshDebugProxy:
         geben_elc = os.path.join(elisp_root, "geben.elc")
         phpsh_el = os.path.join(phpsh_root, "phpsh.el")
         help = os.path.join(elisp_root, "help")
-        fg = self.config.get_option("Emacs", "ForegroundColor")
-        bg = self.config.get_option("Emacs", "BackgroundColor")
-        ina = self.config.get_option("Emacs", "InactiveColor")
-        family = self.config.get_option("Emacs", "FontFamily")
-        size = self.config.get_option("Emacs", "FontSize")
         debugclient_path = config.get_option("Emacs", "XdebugClientPath")
+        x = os.getenv('DISPLAY') and \
+                self.config.get_option("Debugging", "X11") != "no"
+        if x:
+            fg = self.config.get_option("Emacs", "ForegroundColor")
+            bg = self.config.get_option("Emacs", "BackgroundColor")
+            ina = self.config.get_option("Emacs", "InactiveColor")
+            family = self.config.get_option("Emacs", "FontFamily")
+            size = self.config.get_option("Emacs", "FontSize")
 
-        elisp = "(progn (set-face-foreground 'default \""+fg+"\") "+\
-                "(setq active-bg \""+bg+"\") "+\
-                "(setq inactive-bg \""+ina+"\") "\
-                "(setq geben-dbgp-command-line \""+debugclient_path+\
-                            " -p "+str(self.clientport)+"\") "
-        if family or size:
-            elisp += "(set-face-attribute 'default nil"
-            if family:
-                elisp += " :family \""+family+"\""
-            if size:
-                elisp += " :height "+size
-            elisp += ") "
-        if self.config.get_option("Emacs", "InactiveMinimize") == "yes":
-            elisp +="(add-hook 'geben-session-finished-hook "\
-                     "'iconify-frame) "\
-                     "(add-hook 'geben-session-starting-hook "\
-                     "'make-all-frames-visible) "
+
+            elisp = "(progn (set-face-foreground 'default \""+fg+"\") "+\
+                    "(setq active-bg \""+bg+"\") "+\
+                    "(setq inactive-bg \""+ina+"\") "\
+                    "(setq geben-dbgp-command-line \""+debugclient_path+\
+                    " -p "+str(self.clientport)+"\") "
+            if family or size:
+                elisp += "(set-face-attribute 'default nil"
+                if family:
+                    elisp += " :family \""+family+"\""
+                if size:
+                    elisp += " :height "+size
+                elisp += ") "
+            if self.config.get_option("Emacs", "InactiveMinimize") == "yes":
+                elisp +="(add-hook 'geben-session-finished-hook "\
+                         "'iconify-frame) "\
+                         "(add-hook 'geben-session-starting-hook "\
+                         "'make-all-frames-visible) "
+        else:
+            # no X
+            elisp = "(progn (setq geben-dbgp-command-line \""+debugclient_path+\
+                    " -p "+str(self.clientport)+"\") "
+
         if self.config.get_option("Debugging", "Help") == "yes":
             elisp += "(split-window) "\
                      "(find-file-read-only \""+help+"\") "\
@@ -537,8 +551,13 @@ class PhpshDebugProxy:
                      "(switch-to-buffer \"*scratch*\") "
         elisp += ")"
 
-        return ["emacs", "--name", "phpsh-emacs", "-Q", "-l", geben_elc,
-                "-l", phpsh_el, "--eval", elisp, "-f", "geben"]
+        if x:
+            return ["emacs", "--name", "phpsh-emacs", "-Q", "-l", geben_elc,
+                    "-l", phpsh_el, "--eval", elisp, "-f", "geben"]
+        else:
+            return ["emacs", "-nw", "-Q", "-l", geben_elc,
+                    "-l", phpsh_el, "--eval", elisp, "-f", "geben"]
+
 
     def bind_to_port(self):
         """Find an unused pair of adjacent ports (n,n+1) where n is
@@ -607,7 +626,7 @@ class PhpshDebugProxy:
                     try:
                         self.xdebug = XDebug(self.s_accept)
                     except (socket.error, socket.timeout, EOFError):
-                        if stdin_closed():
+                        if self.parent_closed():
                             debug_log("parent HUP'd our stdin")
                             return
                         time.sleep(1)
@@ -616,7 +635,7 @@ class PhpshDebugProxy:
             # because PHP was restarted, start over
             try:
                 cmd_pollset = poll()
-                cmd_pollset.register(0, POLLIN|POLLHUP)
+                cmd_pollset.register(self.p_in.fileno(), POLLIN|POLLHUP)
                 cmd_pollset.register(self.xdebug.get_sockfd(), POLLIN|POLLHUP)
                 phpsh_cmd = None
                 while not phpsh_cmd:
@@ -624,8 +643,9 @@ class PhpshDebugProxy:
                     # keep an eye on PHP, handle restarts
                     events = cmd_pollset.poll()
                     for fd, e in events:
-                        if fd == 0:
-                            phpsh_cmd = raw_input()
+                        if fd == self.p_in.fileno():
+                            phpsh_cmd = self.p_in.readline()
+                            phpsh_cmd.strip()
                             if phpsh_cmd == "run php":
                                 # phpsh sends this when it needs to restart PHP
                                 # Since PHP is not blocked in debugger there
@@ -651,7 +671,7 @@ class PhpshDebugProxy:
                                           "after breakpoint was removed.")
                                 self.xdebug.run()
             except (socket.error, EOFError), msg:
-                if stdin_closed():
+                if self.parent_closed():
                     return # phpsh went away
                 if not self.xdebug.isconnected():
                     continue # xdebug disconnected
@@ -666,14 +686,15 @@ class PhpshDebugProxy:
                     # verify that client is running, start and (re)connect
                     # if necessary
                     self.setup_client()
-                    session = DebugSession(function, self.client, self.xdebug)
-                    flush_stdout("ready")
+                    session = DebugSession(function, self.client,
+                                           self.xdebug, self.p_in)
+                    self.tell_parent("ready")
                 except socket.timeout:
-                    flush_stdout("timed out while waiting for "\
-                                 "client to start")
+                    self.tell_parent("timed out while waiting for "\
+                                     "client to start")
                 except Exception, msg:
                     mstr = str(msg)
-                    flush_stdout("failed to start client: "+mstr[0:40])
+                    self.tell_parent("failed to start client: "+mstr[0:40])
                 if not session:
                     continue
                 try:
@@ -687,10 +708,10 @@ class PhpshDebugProxy:
                     # clean up
                     pass
                 session.stop()
-                if stdin_closed():
+                if self.parent_closed():
                     return
             else:
-                flush_stdout("ERROR: invalid command: " + phpsh_cmd)
+                self.tell_parent("ERROR: invalid command: " + phpsh_cmd)
 
 
 # Based on debugger.py for Vim. Closes underlying socket on all exceptions.
@@ -801,14 +822,30 @@ except Exception, msg:
 
 tracing_enabled = (config.get_option("Debugging", "LogDBGp") == "yes")
 
-# remove this process from the fg process group so that Ctrl-C of phpsh
-# doesn't send us a SIGINT
-os.setpgrp()
+if len(sys.argv) < 5:
+    debug_log("dbgp called with %d arguments, 4 required, exiting..." %
+              len(sys.argv)-1)
+    sys.exit(1)
 
 try:
-    proxy = PhpshDebugProxy(config)
+    p_in = os.fdopen(int(sys.argv[1]), "r", 0) # read end of pipe from parent
+    os.close(int(sys.argv[2]))          # write end of "in" pipe
+    os.close(int(sys.argv[3]))          # read end of "out" pipe
+    p_out = os.fdopen(int(sys.argv[4]), "w", 0) # write end of pipe to parent
 except Exception, msg:
-    print "failed to initialize: " + str(msg)
+    debug_log("Caught an exception while parsing arguments, exiting: " +
+              str(msg))
+    sys.exit(1)
+
+
+# do not die on SIGINT, SIGPIPE
+signal.signal(signal.SIGINT, signal.SIG_IGN)
+signal.signal(signal.SIGPIPE, signal.SIG_IGN)
+
+try:
+    proxy = PhpshDebugProxy(config, p_in, p_out)
+except Exception, msg:
+    p_out.write("failed to initialize: " + str(msg))
     sys.exit(1)
 
 proxy.run()

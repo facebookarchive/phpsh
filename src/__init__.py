@@ -173,7 +173,8 @@ class PhpshConfig:
           'InactiveMinimize': 'yes',
           'FontFamily'      : None,
           'FontSize'        : None,
-          'XdebugClientPath': 'debugclient'})
+          'XdebugClientPath': 'debugclient',
+          'X11'             : 'yes'})
        self.config.add_section('Debugging')
        self.config.add_section('Emacs')
 
@@ -236,6 +237,8 @@ class PhpshState:
         self.verbose = verbose
         self.xdebug_path = None # path to xdebug.so read from config file
         self.xdebug_disabled_reason = None # why debugging was disabled
+        self.to_dbgp = None   # fds of pipe endpoints for writing commands
+        self.from_dbgp = None # to dbgp proxy and reading replies
 
         # so many colors, so much awesome
         if not do_color:
@@ -439,24 +442,33 @@ class PhpshState:
 
     def start_xdebug_proxy(self):
        try:
-          dbgp_py = os.path.join(self.phpsh_root, "dbgp.py")
-          self.p_dbgp = Popen(dbgp_py, stdin=PIPE, stdout=PIPE)
+          to_r, to_w = os.pipe()
+          from_r, from_w = os.pipe()
+          dbgp_py = [os.path.join(self.phpsh_root, "dbgp.py"),
+                         str(to_r), str(to_w), str(from_r), str(from_w)]
+          self.p_dbgp = Popen(dbgp_py)
+          os.close(to_r)
+          os.close(from_w)
+          self.to_dbgp = os.fdopen(to_w, 'w', 0)
+          self.from_dbgp = os.fdopen(from_r, 'r', 0)
           try:
-             dbgp_status = self.p_dbgp.stdout.readline()
+             dbgp_status = self.from_dbgp.readline()
              if dbgp_status.startswith("initialized"):
                 r = re.compile('.*port=([0-9]+).*')
                 m = r.match(dbgp_status)
                 if m:
                    self.dbgp_port = m.group(1)
              else:
-                self.p_dbgp.stdin.close()
+                self.to_dbgp.close()
+                self.from_dbgp.close()
                 self.p_dbgp = None
                 self.with_xdebug = False
                 self.xdebug_disabled_reason = "xdebug proxy " + dbgp_status
           except Exception, msg:
              self.print_error("Could not obtain initialization status "\
                               "from xdebug proxy: " + str(msg))
-             self.p_dbgp.stdin.close()
+             self.to_dbgp.close()
+             self.from_dbgp.close()
              self.p_dbgp = None
              self.with_xdebug = False
        except Exception, msg:
@@ -508,8 +520,7 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
 
     def php_restart(self):
         if self.with_xdebug and self.p_dbgp:
-           self.p_dbgp.stdin.write("run php\n")
-           self.p_dbgp.stdin.flush()
+           self.to_dbgp.write("run php\n")
 
         self.initialized_successfully = False
         try:
@@ -754,17 +765,18 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
           return False
        dbgp_cmd = "x " + m.group(1)
        try:
-          self.p_dbgp.stdin.write(dbgp_cmd+'\n')
-          self.p_dbgp.stdin.flush()
+          self.to_dbgp.write(dbgp_cmd+'\n')
           # TODO: put a timeout on this:
-          dbgp_reply = self.p_dbgp.stdout.readline()
+          dbgp_reply = self.from_dbgp.readline()
           if dbgp_reply != "ready\n":
              self.print_error("xdebug proxy error: " + dbgp_reply)
              return False
        except Exception, msg:
           self.print_error("Failed to communicate with xdebug proxy, "\
                            "disabling PHP debugging: " + str(msg))
-          self.p_dbgp.stdin.close()
+          self.to_dbgp.close()
+          self.from_dbgp.close()
+          self.p_dbgp = None
           self.with_xdebug = False
           return False
        # return PHP code to pass to PHP for eval
