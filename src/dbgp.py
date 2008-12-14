@@ -137,7 +137,7 @@ def get_debugclient_version(debugclient_path):
 class DebugClient:
     """Objects of this class represent instances of debug IDE clients"""
 
-    def __init__(self, host, port, cmd, timeout):
+    def __init__(self, host, port, cmd, timeout, require_x, auto_close):
         self.p_client = None # Popen to client
         self.conn = None     # DBGpConn to client
         self.lasttxid = None     # last txid seen from this client
@@ -148,6 +148,9 @@ class DebugClient:
         self.port = port
         self.cmd = cmd
         self.timeout = timeout
+        self.require_x = require_x   # True iff client requires X
+        self.auto_close = auto_close # True iff client is expected to exit
+                                     # when debug session ends
         self.connect()
 
     def connect(self):
@@ -168,8 +171,7 @@ class DebugClient:
                 # could not connect and client is not local or no command
                 # to start a client. Propagate exception.
                 raise socket.error, msg
-            x11 = config.get_option("Debugging", "X11")
-            if x11 and x11.startswith("require") and not os.getenv('DISPLAY'):
+            if self.require_x and not os.getenv('DISPLAY'):
                 raise Exception, "X11 is required and DISPLAY is not set"
             # client is local, X display is set, try to start it
             debug_log("Starting client: " + " ".join(self.cmd))
@@ -178,8 +180,10 @@ class DebugClient:
             tstart = time.time()
             while True:
                 try:
+                    debug_log("Connecting to client")
                     sock.connect(('', self.port))
                     sock.settimeout(None)
+                    debug_log("Connected to client")
                     break
                 except socket.error:
                     # failed to connect, likely client is not up yet
@@ -219,13 +223,17 @@ class DebugClient:
         if self.stopped or not self.lasttxid or not self.lastdbgpcmd or \
            not self.conn.isconnected():
             return
-        stopping = '<?xml version="1.0" encoding="iso-8859-1"?>\n'\
+        stopped = '<?xml version="1.0" encoding="iso-8859-1"?>\n'\
                    '<response xmlns="urn:debugger_protocol_v1" '\
                    'xmlns:xdebug="http://xdebug.org/dbgp/xdebug" '\
                    'command="'+self.lastdbgpcmd+'" transaction_id="'\
                    +self.lasttxid+'" status="stopped" reason="ok"></response>'
-        self.send_msg(stopping)
+        self.send_msg(stopped)
         self.stopped = True
+
+    def wait(self):
+        if self.p_client:
+            os.waitpid(self.p_client.pid, 0)
 
     def close(self):
         """Close connection to debug client and kill it if we started it"""
@@ -235,10 +243,10 @@ class DebugClient:
         if self.p_client:
             try:
                 os.kill(self.p_client.pid, signal.SIGKILL)
+                os.waitpid(self.p_client.pid, 0) # collect zombie
             except OSError:
                 pass
             self.p_client = None
-
 
 class XDebug:
     """Encapsulates XDebug connection and communication"""
@@ -341,6 +349,9 @@ class DebugSession:
         # set a breakpoint on the function being debugged and on
         # PHPShell__eval_completed(), which phpsh.php will execute
         # right after the eval(), continue PHP execution
+
+        debug_log("running debug session")
+
         self.funbp = self.xdebug.set_breakpoint(self.function)
         self.donebp = self.xdebug.set_breakpoint('PHPShell__eval_completed')
         self.xdebug.run()
@@ -381,8 +392,7 @@ class DebugSession:
             events = session_set.poll()
             for fd, e in events:
                 if fd == self.p_in.fileno():
-                    phpsh_cmd = self.p_in.readline()
-                    phpsh_cmd.strip()
+                    phpsh_cmd = self.p_in.readline().strip()
                     if phpsh_cmd == 'run php':
                         # phpsh wants to restart php
                         # if php is blocked in xdebug, send a run command
@@ -403,22 +413,36 @@ class DebugSession:
         """Do our best to clean up if we got to the end of a session
         or if client or xdebug connection had an exception. This
         function does not throw any IO exceptions."""
+        if self.client:
+            try: # send client a stop message at end of session
+                self.client.stop()
+                # if our client is emacs that we started and it is
+                # running without X11, phpsh.el will make it exit at the
+                # end of debug session. We must wait for that event before
+                # allowing php to run and phpsh to try to print to terminal.
+                # Emacs uses tcsetpgrp() to effectively place all other
+                # processes in its pgroup (including phpsh) in the background.
+                # Allowing phpsh to print to terminal before emacs reset the
+                # terminal pgroup back will result in SIGTTOU sent to phpsh
+                # and dbgp, suspending them. Even if we wignored the signals,
+                # anything phpsh prints to terminal before emacs resets it
+                # will be lost or unreadable.
+                if self.client.auto_close:
+                    debug_log("waiting for client to exit")
+                    self.client.wait()
+            except (socket.error, EOFError):
+                pass
         if self.xdebug and self.xdebug.isconnected():
             try:
                 # remove all bps we set in xdebug so that php will not
                 # get stuck on them when phpsh issues non-debug evals
+                debug_log("removing all breakpoints")
                 self.xdebug.remove_all_breakpoints()
+                debug_log("unblocking script")
                 self.xdebug.run()
             except (socket.error, EOFError):
                 pass
         self.funbp = self.donebp = None
-        # do not close the client at the end of session just send it a
-        # stop message
-        if self.client:
-            try:
-                self.client.stop()
-            except (socket.error, EOFError):
-                pass
 
 
 class PhpshDebugProxy:
@@ -441,6 +465,9 @@ class PhpshDebugProxy:
         self.s_accept = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.p_in = p_in   # file encapsulating a pipe from parent
         self.p_out = p_out # file encapsulating a pipe to parent
+        self.client_auto_close = False # client exits after every session
+        self.use_x = os.getenv('DISPLAY') and \
+                     self.config.get_option("Debugging", "X11") != "no"
 
         # host on which client runs:
         self.clienthost = config.get_option("Debugging", "ClientHost")
@@ -473,6 +500,7 @@ class PhpshDebugProxy:
                       str(debugclient_version) + " is too low. 0.10.0 or "\
                       "above required"
             self.cmd = self.emacs_command()
+            self.client_auto_close = not self.use_x
         else:
             self.cmd = shlex.split(cmd)
 
@@ -510,9 +538,8 @@ class PhpshDebugProxy:
         phpsh_el = os.path.join(phpsh_root, "phpsh.el")
         help = os.path.join(elisp_root, "help")
         debugclient_path = config.get_option("Emacs", "XdebugClientPath")
-        x = os.getenv('DISPLAY') and \
-                self.config.get_option("Debugging", "X11") != "no"
-        if x:
+
+        if self.use_x:
             fg = self.config.get_option("Emacs", "ForegroundColor")
             bg = self.config.get_option("Emacs", "BackgroundColor")
             ina = self.config.get_option("Emacs", "InactiveColor")
@@ -551,7 +578,7 @@ class PhpshDebugProxy:
                      "(switch-to-buffer \"*scratch*\") "
         elisp += ")"
 
-        if x:
+        if self.use_x:
             return ["emacs", "--name", "phpsh-emacs", "-Q", "-l", geben_elc,
                     "-l", phpsh_el, "--eval", elisp, "-f", "geben"]
         else:
@@ -611,9 +638,12 @@ class PhpshDebugProxy:
                 except (socket.error, EOFError):
                     pass
 
+        require_x = self.config.get_option("Debugging", "X11")\
+                                                         .startswith("require")
         if not self.client or not self.client.isconnected():
             self.client = DebugClient(self.clienthost, self.clientport,
-                                      self.cmd, self.client_timeout)
+                                      self.cmd, self.client_timeout, require_x,
+                                      self.client_auto_close)
 
     def run(self):
         """This is the proxy's main loop"""
@@ -624,35 +654,29 @@ class PhpshDebugProxy:
                 self.xdebug = None
                 while not self.xdebug:
                     try:
+                        debug_log("creating XDebug object")
                         self.xdebug = XDebug(self.s_accept)
                     except (socket.error, socket.timeout, EOFError):
                         if self.parent_closed():
-                            debug_log("parent HUP'd our stdin")
+                            debug_log("parent closed its end of pipe")
                             return
                         time.sleep(1)
             # at this point self.xdebug is initialized
             # block waiting for a command from phpsh, if xdebug disconnects
             # because PHP was restarted, start over
+            phpsh_cmd = None
             try:
                 cmd_pollset = poll()
                 cmd_pollset.register(self.p_in.fileno(), POLLIN|POLLHUP)
                 cmd_pollset.register(self.xdebug.get_sockfd(), POLLIN|POLLHUP)
-                phpsh_cmd = None
                 while not phpsh_cmd:
                     # wait for a command from phpsh
                     # keep an eye on PHP, handle restarts
                     events = cmd_pollset.poll()
                     for fd, e in events:
                         if fd == self.p_in.fileno():
-                            phpsh_cmd = self.p_in.readline()
-                            phpsh_cmd.strip()
-                            if phpsh_cmd == "run php":
-                                # phpsh sends this when it needs to restart PHP
-                                # Since PHP is not blocked in debugger there
-                                # is nothing to do. Ignore.
-                                debug_log("got 'run php' from phpsh while "\
-                                          "waiting for x command")
-                                phpsh_cmd = None
+                            phpsh_cmd = self.p_in.readline().strip()
+                            debug_log("Got command: >>" + phpsh_cmd + "<<")
                             break
                         elif fd == self.xdebug.get_sockfd():
                             # xdebug disconnected or sent us something
@@ -671,6 +695,7 @@ class PhpshDebugProxy:
                                           "after breakpoint was removed.")
                                 self.xdebug.run()
             except (socket.error, EOFError), msg:
+                debug_log("Exception while waiting for command: " + str(msg))
                 if self.parent_closed():
                     return # phpsh went away
                 if not self.xdebug.isconnected():
@@ -688,6 +713,8 @@ class PhpshDebugProxy:
                     self.setup_client()
                     session = DebugSession(function, self.client,
                                            self.xdebug, self.p_in)
+                    debug_log("debug session created, "\
+                              "sending 'ready' to parent")
                     self.tell_parent("ready")
                 except socket.timeout:
                     self.tell_parent("timed out while waiting for "\
@@ -701,6 +728,7 @@ class PhpshDebugProxy:
                     # wait for an initial break message issued by
                     # xdebug_break() that phpsh is going to execute
                     # right before the target function
+                    debug_log("waiting for inital 'break'")
                     self.xdebug.recv_msg()
                     session.run()
                 except (socket.error, EOFError):
@@ -710,6 +738,11 @@ class PhpshDebugProxy:
                 session.stop()
                 if self.parent_closed():
                     return
+            elif phpsh_cmd == "run php":
+                # phpsh sends this when it needs to restart PHP
+                # Since PHP is not blocked in debugger there
+                # is nothing to do. Ignore.
+                debug_log("got 'run php' from phpsh while waiting for x command")
             else:
                 self.tell_parent("ERROR: invalid command: " + phpsh_cmd)
 
@@ -828,9 +861,15 @@ if len(sys.argv) < 5:
     sys.exit(1)
 
 try:
-    p_in = os.fdopen(int(sys.argv[1]), "r", 0) # read end of pipe from parent
-    os.close(int(sys.argv[2]))          # write end of "in" pipe
-    os.close(int(sys.argv[3]))          # read end of "out" pipe
+    p_in = os.fdopen(int(sys.argv[1]), "r", 0)  # read end of pipe from parent
+    try:
+        os.close(int(sys.argv[2]))              # write end of "in" pipe
+    except OSError:
+        pass
+    try:
+        os.close(int(sys.argv[3]))              # read end of "out" pipe
+    except OSError:
+        pass
     p_out = os.fdopen(int(sys.argv[4]), "w", 0) # write end of pipe to parent
 except Exception, msg:
     debug_log("Caught an exception while parsing arguments, exiting: " +

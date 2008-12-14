@@ -296,8 +296,8 @@ class PhpshState:
                         + "or above required."
                        self.with_xdebug = False
                  except Exception, msg:
-                    self.xdebug_disabled_reason = "Could not detect "\
-                                                  "Xdebug version"
+                    self.xdebug_disabled_reason = self.xdebug_path + \
+                                       " is incompatible with your php build"
                     self.with_xdebug = False
               except OSError:
                  self.xdebug_disabled_reason = "xdebug.so not found, tried "\
@@ -306,7 +306,7 @@ class PhpshState:
                  self.xdebug_path = None
            else:
               self.xdebug_disabled_reason = "Could not identify PHP extensions"\
-                                      " directory, is php-config in your PATH?"
+                            " directory. Make sure php-config is in your PATH."
               self.with_xdebug = False
               self.xdebug_path = None
            if self.verbose and not self.with_xdebug \
@@ -425,12 +425,11 @@ class PhpshState:
                 self.clr_default
 
     def get_xdebug_version(self, comm_base):
-       vline = Popen(comm_base + " -r 'phpinfo();' |"\
-                     " grep '^ *with Xdebug v[0-9][0-9.]*'",
-                     shell=True, stdout=PIPE).communicate()[0]
+       vline, err = Popen(comm_base + " -r 'phpinfo();' |"\
+                          " grep '^ *with Xdebug v[0-9][0-9.]*'",
+                          shell=True, stdout=PIPE, stderr=PIPE).communicate()
        if not vline:
-          raise Exception, \
-                "Could not find \"with Xdebug\" in phpinfo() output"
+          raise Exception, "Failed to load Xdebug\n" + err
        m = re.compile(" *with Xdebug v([0-9.]+)").match(vline)
        if not m:
           raise Exception, \
@@ -527,10 +526,10 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
             self.p.stdout.close()
             self.p.stderr.close()
             self.p.stdin.close()
-            self.p.wait()
+            os.waitpid(self.p.pid, 0)
         except (IOError, KeyboardInterrupt):
            os.kill(self.p.pid, signal.SIGKILL)
-           self.p.wait() # collect the zombie
+           os.waitpid(self.p.pid, 0) # collect the zombie
 
         return self.php_open_and_check()
 
@@ -853,7 +852,7 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
             self.p.stderr.close()
             self.p.stdin.close()
             signal.alarm(5)
-            self.p.wait()
+            os.waitpid(self.p.pid, 0)
         except (IOError, OSError, KeyboardInterrupt):
            os.kill(self.p.pid, signal.SIGKILL)
-           self.p.wait() # collect the zombie
+           os.waitpid(self.p.pid, 0) # collect the zombie
