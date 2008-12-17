@@ -135,23 +135,46 @@ def get_debugclient_version(debugclient_path):
 
 
 class DebugClient:
-    """Objects of this class represent instances of debug IDE clients"""
+    """Objects of this class are interfaces to debug IDE clients. A DebugClient object may exist even if the underlying IDE process is no longer running."""
 
-    def __init__(self, host, port, cmd, timeout, require_x, auto_close):
+    def __init__(self, config, port):
         self.p_client = None # Popen to client
         self.conn = None     # DBGpConn to client
-        self.lasttxid = None     # last txid seen from this client
+        self.lasttxid = None # last txid seen from this client
         self.lastdbgpcmd = None  # name of last command read from client
         self.stopped = True  # never sent anything to this client, or
                              # last message was "stopped"
-        self.host = host
+        self.config = config # RawConfigParser
         self.port = port
-        self.cmd = cmd
-        self.timeout = timeout
-        self.require_x = require_x   # True iff client requires X
-        self.auto_close = auto_close # True iff client is expected to exit
-                                     # when debug session ends
-        self.connect()
+        self.host = config.get_option("Debugging", "ClientHost")
+        self.timeout = parse_timeout(config.get_option("Debugging",
+                                                       "ClientTimeout"))
+        self.auto_close = False # client exits after each debugging session
+                                # self.emacs_command() may set this to True
+
+        debug_log("creating DebugClient object")
+
+        if config.get_option("Debugging", "X11").startswith("require") \
+               and not os.getenv('DISPLAY'):
+            debug_log("X11 is required and DISPLAY is not set")
+            raise Exception, "X11 is required and DISPLAY is not set"
+
+        cmd = config.get_option("Debugging", "DebugClient")
+        if cmd.startswith("emacs"):
+            emacs_version = get_emacs_version()
+            if emacs_version < [22, 1]:
+                raise Exception, "emacs version " + str(emacs_version) +\
+                                 " is too low, 22.1 or above required"
+            debugclient_path = config.get_option("Emacs", "XdebugClientPath")
+            debugclient_version = get_debugclient_version(debugclient_path)
+            if debugclient_version < [0, 10, 0]:
+                raise Exception, "debugclient (xdebug client) version " +\
+                      str(debugclient_version) + " is too low. 0.10.0 or "\
+                      "above required"
+            self.cmd = self.emacs_command(config)
+        else:
+            self.cmd = shlex.split(cmd)
+
 
     def connect(self):
         """Try to connect to self.host:self.port (if host is an empty string,
@@ -160,8 +183,28 @@ class DebugClient:
         socket.timeout if client is not up until timeout, OSError if
         client could not be started"""
         global config
-        if self.conn and self.conn.isconnected():
-            return # already connected
+        if self.conn:
+            if self.conn.isconnected():
+                # check if the client is still connected by reading
+                # everything that the client sent us since the end of
+                # last session (if any) and checking for HUP
+                client_set = poll()
+                client_set.register(self.conn.get_sockfd(), POLLIN)
+                events = client_set.poll(0)
+                try:
+                    while events:
+                        fd, e = events[0]
+                        if e&POLLHUP:
+                            self.conn.close()
+                            self.conn = None
+                            raise EOFError
+                        else:
+                            self.recv_cmd()
+                            events = client_set.poll(0)
+                    return # still connected
+                except (socket.error, EOFError):
+                    pass
+
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             sock.connect((self.host, self.port))
@@ -171,8 +214,6 @@ class DebugClient:
                 # could not connect and client is not local or no command
                 # to start a client. Propagate exception.
                 raise socket.error, msg
-            if self.require_x and not os.getenv('DISPLAY'):
-                raise Exception, "X11 is required and DISPLAY is not set"
             # client is local, X display is set, try to start it
             debug_log("Starting client: " + " ".join(self.cmd))
             self.p_client = Popen(self.cmd, close_fds=True)
@@ -197,9 +238,6 @@ class DebugClient:
                     time.sleep(1)
         self.conn = DBGpConn(sock)
 
-    def isconnected(self):
-        return self.conn and self.conn.isconnected()
-
     def send_msg(self, msg):
         self.conn.send_msg(msg)
         self.stopped = False
@@ -222,7 +260,8 @@ class DebugClient:
     def stop(self):
         if self.stopped or not self.lasttxid or not self.lastdbgpcmd or \
            not self.conn.isconnected():
-            return
+            # client is already stopped or hasn't run a debug session
+            return False
         stopped = '<?xml version="1.0" encoding="iso-8859-1"?>\n'\
                    '<response xmlns="urn:debugger_protocol_v1" '\
                    'xmlns:xdebug="http://xdebug.org/dbgp/xdebug" '\
@@ -230,6 +269,20 @@ class DebugClient:
                    +self.lasttxid+'" status="stopped" reason="ok"></response>'
         self.send_msg(stopped)
         self.stopped = True
+        # If our client is emacs that we started and it is
+        # running without X11, phpsh.el will make it exit at the
+        # end of debug session. We must wait for that event before
+        # allowing php to run and phpsh to try to print to terminal.
+        # Emacs uses tcsetpgrp() to effectively place all other
+        # processes in its pgroup (including phpsh) in the background.
+        # Allowing phpsh to print to terminal before emacs reverts the
+        # terminal pgroup will result in SIGTTOU sent to phpsh
+        # and dbgp, suspending them. Even if we wignored the signals,
+        # anything phpsh prints to terminal before emacs resets it
+        # will be lost or unreadable.
+        if self.auto_close:
+            debug_log("waiting for client to exit")
+            self.wait()
 
     def wait(self):
         if self.p_client:
@@ -243,10 +296,77 @@ class DebugClient:
         if self.p_client:
             try:
                 os.kill(self.p_client.pid, signal.SIGKILL)
-                os.waitpid(self.p_client.pid, 0) # collect zombie
+                self.wait() # collect zombie
             except OSError:
                 pass
             self.p_client = None
+
+    def emacs_command(self, config):
+        """Returns a list containing a shell command to start and
+        configure emacs according to the settings in phpsh config file"""
+        phpsh_root = os.path.dirname(os.path.realpath(__file__))
+        elisp_root = os.path.join(phpsh_root, "xdebug-clients/geben")
+        geben_elc = os.path.join(elisp_root, "geben.elc")
+        phpsh_el = os.path.join(phpsh_root, "phpsh.el")
+        help = os.path.join(elisp_root, "help")
+        debugclient_path = config.get_option("Emacs", "XdebugClientPath")
+
+        use_x = os.getenv('DISPLAY') and \
+                     config.get_option("Debugging", "X11") != "no"
+        if use_x:
+            fg = config.get_option("Emacs", "ForegroundColor")
+            bg = config.get_option("Emacs", "BackgroundColor")
+            ina = config.get_option("Emacs", "InactiveColor")
+            family = config.get_option("Emacs", "FontFamily")
+            size = config.get_option("Emacs", "FontSize")
+
+            elisp = "(progn (set-face-foreground 'default \""+fg+"\") "+\
+                    "(setq active-bg \""+bg+"\") "+\
+                    "(setq inactive-bg \""+ina+"\") "\
+                    "(setq geben-dbgp-command-line \""+debugclient_path+\
+                    " -p "+str(self.port)+"\") "
+            if family or size:
+                elisp += "(set-face-attribute 'default nil"
+                if family:
+                    elisp += " :family \""+family+"\""
+                if size:
+                    elisp += " :height "+size
+                elisp += ") "
+            if config.get_option("Emacs", "InactiveMinimize") == "yes":
+                elisp +="(add-hook 'geben-session-finished-hook "\
+                         "'iconify-frame) "\
+                         "(add-hook 'geben-session-starting-hook "\
+                         "'make-all-frames-visible) "
+        else:
+            # no X
+            self.auto_close = True
+            elisp = "(progn (setq geben-dbgp-command-line \""+debugclient_path+\
+                    " -p "+str(self.port)+"\") "\
+                    "(setq geben-dbgp-redirect-stdout-current :intercept) "\
+                    "(setq geben-dbgp-redirect-stderr-current :intercept) "
+            # in terminal mode we set php stdout/err redirection mode
+            # to "intercept" in geben.  this will make xdebug forward
+            # php stdout/err to geben over the TCP connection instead
+            # of writing to the parent pipe. This prevents phpsh from
+            # printing the output to terminal while emacs is running,
+            # which could mess up display and generate a SIGTTOU.
+
+        if config.get_option("Debugging", "Help") == "yes":
+            elisp += "(split-window) "\
+                     "(find-file-read-only \""+help+"\") "\
+                     "(other-window 1) "
+        else:
+            elisp += "(find-file-read-only \""+help+"\") "\
+                     "(switch-to-buffer \"*scratch*\") "
+        elisp += ")"
+
+        if use_x:
+            return ["emacs", "--name", "phpsh-emacs", "-Q", "-l", geben_elc,
+                    "-l", phpsh_el, "--eval", elisp, "-f", "geben"]
+        else:
+            return ["emacs", "-nw", "-Q", "-l", geben_elc,
+                    "-l", phpsh_el, "--eval", elisp, "-f", "geben"]
+
 
 class XDebug:
     """Encapsulates XDebug connection and communication"""
@@ -335,25 +455,22 @@ class DebugSession:
 
     def __init__(self, function, client, xdebug, p_in):
         self.client = client
-        self.clienthost = client.host
-        self.clientport = client.port
-        self.clientcmd = client.cmd
         self.xdebug = xdebug
         self.function = function
-        self.funbp = None # breakpoint id for .function
-        self.donebp = None # breakpoint id for PHPShell__eval_completed()
         self.p_in = p_in  # file encapsulating "from parent" pipe end
 
-    def run(self):
-        # xdebug must be in 'break' state here
+
+    def setup(self):
+        """This function must be called when php just executed the initial xdebug_break() call that starts a new debugging session and the initial <break> message has been received from xdebug. setup() verifies that the function call being debugged is valid. If it is, a debug client is started and its view is set to display the first line of function. If the function call is invalid, for example, the function name cannot be found, setup() throws an Exception"""
+
         # set a breakpoint on the function being debugged and on
         # PHPShell__eval_completed(), which phpsh.php will execute
         # right after the eval(), continue PHP execution
 
-        debug_log("running debug session")
+        debug_log("setting up debug session")
 
-        self.funbp = self.xdebug.set_breakpoint(self.function)
-        self.donebp = self.xdebug.set_breakpoint('PHPShell__eval_completed')
+        funbp = self.xdebug.set_breakpoint(self.function)
+        donebp = self.xdebug.set_breakpoint('PHPShell__eval_completed')
         self.xdebug.run()
 
         filename = None
@@ -366,23 +483,29 @@ class DebugSession:
             # Execution stopped at PHPShell__eval_completed() or in the eval().
             # Abort the session.
             self.client = None
-            return
+            raise Exception, "Invalid PHP function call"
 
         # at this point reply and filename are initialized. Delete
         # breakpoint at self.function, then send <init> to client with
         # fileuri attr set to filename (followed by the break message
         # itself?)
-        self.xdebug.remove_breakpoint(self.funbp)
-        self.funbp = None
+        self.xdebug.remove_breakpoint(funbp)
         r = re.compile(' fileuri="([^"]*)"', re.M)
         client_init = r.sub(' fileuri="' + filename + '"',
                             self.xdebug.get_dbgp_init())
+        self.client.connect()
+
         self.client.send_msg(client_init)
         #self.client.send_msg(reply) --this breaks geben, so disabling for now
         # but vim seems to need id
 
-        # forward messages between client and xdebug until xdebug
-        # stops in phpsh.php, client closes connection or parent closes stdin
+
+    def run(self):
+        """forward messages between client and xdebug until xdebug stops in
+        phpsh.php, client closes connection or parent closes stdin"""
+
+        debug_log("running debug session")
+
         session_set = poll()
         session_set.register(self.client.get_sockfd(), POLLIN)
         session_set.register(self.xdebug.get_sockfd(), POLLIN)
@@ -414,22 +537,9 @@ class DebugSession:
         or if client or xdebug connection had an exception. This
         function does not throw any IO exceptions."""
         if self.client:
-            try: # send client a stop message at end of session
+            try:
+                # Send client a stop message at end of session.
                 self.client.stop()
-                # if our client is emacs that we started and it is
-                # running without X11, phpsh.el will make it exit at the
-                # end of debug session. We must wait for that event before
-                # allowing php to run and phpsh to try to print to terminal.
-                # Emacs uses tcsetpgrp() to effectively place all other
-                # processes in its pgroup (including phpsh) in the background.
-                # Allowing phpsh to print to terminal before emacs reset the
-                # terminal pgroup back will result in SIGTTOU sent to phpsh
-                # and dbgp, suspending them. Even if we wignored the signals,
-                # anything phpsh prints to terminal before emacs resets it
-                # will be lost or unreadable.
-                if self.client.auto_close:
-                    debug_log("waiting for client to exit")
-                    self.client.wait()
             except (socket.error, EOFError):
                 pass
         if self.xdebug and self.xdebug.isconnected():
@@ -442,7 +552,6 @@ class DebugSession:
                 self.xdebug.run()
             except (socket.error, EOFError):
                 pass
-        self.funbp = self.donebp = None
 
 
 class PhpshDebugProxy:
@@ -465,47 +574,33 @@ class PhpshDebugProxy:
         self.s_accept = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.p_in = p_in   # file encapsulating a pipe from parent
         self.p_out = p_out # file encapsulating a pipe to parent
-        self.client_auto_close = False # client exits after every session
-        self.use_x = os.getenv('DISPLAY') and \
-                     self.config.get_option("Debugging", "X11") != "no"
 
         # host on which client runs:
-        self.clienthost = config.get_option("Debugging", "ClientHost")
+        clienthost = config.get_option("Debugging", "ClientHost")
         # client listens on this port
-        self.clientport = parse_port(config.get_option("Debugging",
-                                                       "ClientPort"))
-        # seconds to wait for client to init
-        self.client_timeout = parse_timeout(config.get_option("Debugging",
-                                                              "ClientTimeout"))
+        clientport = parse_port(config.get_option("Debugging", "ClientPort"))
+
+        if not clientport and clienthost and clienthost != "localhost" and \
+           not clienthost.startswith("127.0.0."):
+            raise Exception, "configuration error: remote ClientHost with "\
+                  "no ClientPort"
+
         listenport = parse_port(config.get_option("Debugging", "ProxyPort"))
         if listenport:
             self.s_accept.bind(('', listenport))
         else:
             listenport = self.bind_to_port()
 
-        self.listenport = listenport # port on which proxy listens
-        if not self.clientport:
-            self.clientport = listenport+1
+        if not clientport:
+            clientport = listenport+1
 
-        cmd = config.get_option("Debugging", "DebugClient")
-        if cmd.startswith("emacs"):
-            emacs_version = get_emacs_version()
-            if emacs_version < [22, 1]:
-                raise Exception, "emacs version " + str(emacs_version) +\
-                                 " is too low, 22.1 or above required"
-            debugclient_path = config.get_option("Emacs", "XdebugClientPath")
-            debugclient_version = get_debugclient_version(debugclient_path)
-            if debugclient_version < [0, 10, 0]:
-                raise Exception, "debugclient (xdebug client) version " +\
-                      str(debugclient_version) + " is too low. 0.10.0 or "\
-                      "above required"
-            self.cmd = self.emacs_command()
-            self.client_auto_close = not self.use_x
-        else:
-            self.cmd = shlex.split(cmd)
-
-        self.s_accept.listen(1)
-        self.s_accept.settimeout(1)
+        try:
+            self.client = DebugClient(config, clientport)
+            self.s_accept.listen(1)
+            self.s_accept.settimeout(1)
+        except Exception:
+            self.s_accept.close()
+            raise
 
         # tell parent we have initialized
         debug_log("initialized, bound to port " + str(listenport))
@@ -527,63 +622,6 @@ class PhpshDebugProxy:
     def tell_parent(self, str):
         self.p_out.write(str+'\n')
         self.p_out.flush()
-
-
-    def emacs_command(self):
-        """Returns a list containing a shell command to start and
-        configure emacs according to the settings in phpsh config file"""
-        phpsh_root = os.path.dirname(os.path.realpath(__file__))
-        elisp_root = os.path.join(phpsh_root, "xdebug-clients/geben")
-        geben_elc = os.path.join(elisp_root, "geben.elc")
-        phpsh_el = os.path.join(phpsh_root, "phpsh.el")
-        help = os.path.join(elisp_root, "help")
-        debugclient_path = config.get_option("Emacs", "XdebugClientPath")
-
-        if self.use_x:
-            fg = self.config.get_option("Emacs", "ForegroundColor")
-            bg = self.config.get_option("Emacs", "BackgroundColor")
-            ina = self.config.get_option("Emacs", "InactiveColor")
-            family = self.config.get_option("Emacs", "FontFamily")
-            size = self.config.get_option("Emacs", "FontSize")
-
-
-            elisp = "(progn (set-face-foreground 'default \""+fg+"\") "+\
-                    "(setq active-bg \""+bg+"\") "+\
-                    "(setq inactive-bg \""+ina+"\") "\
-                    "(setq geben-dbgp-command-line \""+debugclient_path+\
-                    " -p "+str(self.clientport)+"\") "
-            if family or size:
-                elisp += "(set-face-attribute 'default nil"
-                if family:
-                    elisp += " :family \""+family+"\""
-                if size:
-                    elisp += " :height "+size
-                elisp += ") "
-            if self.config.get_option("Emacs", "InactiveMinimize") == "yes":
-                elisp +="(add-hook 'geben-session-finished-hook "\
-                         "'iconify-frame) "\
-                         "(add-hook 'geben-session-starting-hook "\
-                         "'make-all-frames-visible) "
-        else:
-            # no X
-            elisp = "(progn (setq geben-dbgp-command-line \""+debugclient_path+\
-                    " -p "+str(self.clientport)+"\") "
-
-        if self.config.get_option("Debugging", "Help") == "yes":
-            elisp += "(split-window) "\
-                     "(find-file-read-only \""+help+"\") "\
-                     "(other-window 1) "
-        else:
-            elisp += "(find-file-read-only \""+help+"\") "\
-                     "(switch-to-buffer \"*scratch*\") "
-        elisp += ")"
-
-        if self.use_x:
-            return ["emacs", "--name", "phpsh-emacs", "-Q", "-l", geben_elc,
-                    "-l", phpsh_el, "--eval", elisp, "-f", "geben"]
-        else:
-            return ["emacs", "-nw", "-Q", "-l", geben_elc,
-                    "-l", phpsh_el, "--eval", elisp, "-f", "geben"]
 
 
     def bind_to_port(self):
@@ -611,42 +649,8 @@ class PhpshDebugProxy:
         raise socket.error, "No ports available"
 
 
-    def setup_client(self):
-        """If we don't yet have a client, start and connect, return
-        False. If we had a client and it disconnected, clean up,
-        restart, and reconnect, return True. If the client exists and
-        is ok, do nothing, just return False."""
-
-        # check if the client is still connected by reading everything that
-        # the client sent us since the end of last session (if any) and
-        # checking for HUP
-        if self.client:
-            if self.client.isconnected():
-                client_set = poll()
-                client_set.register(self.client.get_sockfd(), POLLIN)
-                events = client_set.poll(0)
-                try:
-                    while events:
-                        fd, e = events[0]
-                        if e&POLLHUP:
-                            self.client.close()
-                            self.client = None
-                            raise EOFError
-                        else:
-                            self.client.recv_cmd()
-                            events = client_set.poll(0)
-                except (socket.error, EOFError):
-                    pass
-
-        require_x = self.config.get_option("Debugging", "X11")\
-                                                         .startswith("require")
-        if not self.client or not self.client.isconnected():
-            self.client = DebugClient(self.clienthost, self.clientport,
-                                      self.cmd, self.client_timeout, require_x,
-                                      self.client_auto_close)
-
     def run(self):
-        """This is the proxy's main loop"""
+        """main loop of dbgp proxy"""
         while True:
             if self.xdebug == None or not self.xdebug.isconnected():
                 # if we do not have an xdebug connection, accept one
@@ -681,7 +685,11 @@ class PhpshDebugProxy:
                         elif fd == self.xdebug.get_sockfd():
                             # xdebug disconnected or sent us something
                             # after <init> or after previous client
-                            # session ended
+                            # session ended. This cannot be the
+                            # initial <break> of next session because
+                            # phpsh only evals xdebug_break() after it
+                            # gets a "ready" from dbgp, and we haven't
+                            # sent it yet.
                             res = self.xdebug.recv_msg()
                             filename = dbgp_get_filename(res)
                             if filename and filename.endswith("/phpsh.php"):
@@ -707,33 +715,31 @@ class PhpshDebugProxy:
             if phpsh_cmd.startswith("x "):
                 function = phpsh_cmd[2:].strip()
                 session = None
-                try:
-                    # verify that client is running, start and (re)connect
-                    # if necessary
-                    self.setup_client()
-                    session = DebugSession(function, self.client,
-                                           self.xdebug, self.p_in)
-                    debug_log("debug session created, "\
-                              "sending 'ready' to parent")
-                    self.tell_parent("ready")
-                except socket.timeout:
-                    self.tell_parent("timed out while waiting for "\
-                                     "client to start")
-                except Exception, msg:
-                    mstr = str(msg)
-                    self.tell_parent("failed to start client: "+mstr[0:40])
-                if not session:
-                    continue
+                # in the future we will be checking here if debugging
+                # can be started, for now we create a session object
+                # unconditionally and tell phpsh to go on. If later we
+                # fail to start a debug client, we just continue
+                # execution without debugging.
+                session = DebugSession(function, self.client,
+                                       self.xdebug, self.p_in)
+                debug_log("sending 'ready' to parent")
+                self.tell_parent("ready")
                 try:
                     # wait for an initial break message issued by
                     # xdebug_break() that phpsh is going to execute
                     # right before the target function
                     debug_log("waiting for inital 'break'")
                     self.xdebug.recv_msg()
+
+                    # php is stopped in xdebug after executing xdebug_break()
+                    session.setup()
+
                     session.run()
-                except (socket.error, EOFError):
+                except Exception, msg:
                     # client, PHP, or phpsh exited, session.stop() will
                     # clean up
+                    debug_log("Exception while setting up or running debug "
+                              "session: " + str(msg))
                     pass
                 session.stop()
                 if self.parent_closed():
@@ -742,7 +748,8 @@ class PhpshDebugProxy:
                 # phpsh sends this when it needs to restart PHP
                 # Since PHP is not blocked in debugger there
                 # is nothing to do. Ignore.
-                debug_log("got 'run php' from phpsh while waiting for x command")
+                debug_log("got 'run php' from phpsh while waiting "
+                          "for x command")
             else:
                 self.tell_parent("ERROR: invalid command: " + phpsh_cmd)
 
@@ -884,6 +891,7 @@ signal.signal(signal.SIGPIPE, signal.SIG_IGN)
 try:
     proxy = PhpshDebugProxy(config, p_in, p_out)
 except Exception, msg:
+    debug_log("failed to initialize: " + str(msg))
     p_out.write("failed to initialize: " + str(msg))
     sys.exit(1)
 
