@@ -23,6 +23,8 @@
               '(lambda ()
                  (kill-emacs))))
 
+(add-hook 'c-mode-hook 'geben-mode)
+
 (setq blink-matching-paren t)
 (setq blink-matching-paren-on-screen t)
 (show-paren-mode 1)
@@ -30,5 +32,6 @@
 (setq case-fold-search t)
 (set-fringe-mode (quote (nil . 0)))
 
-(setq auto-mode-alist (append '(("\\.php\\'" . c-mode)) auto-mode-alist))
-(setq auto-mode-alist (append '(("\\.phpt$" . c-mode)) auto-mode-alist))
+(setq auto-mode-alist (append '(("\\.php\\'" . c-mode)
+                                ("\\.phpt$" . c-mode)
+                                ("\\.inc\\'" . c-mode)) auto-mode-alist))
