@@ -193,7 +193,7 @@ class ___PHPShell___ {
           echo "\033[36m"; // cyan
         }
 
-        if (null === $evalue || is_scalar($evalue) || is_array($evalue)) {
+        if (null === $evalue || is_scalar($evalue)) {
           var_export($evalue);
         } else {
           print_r($evalue);
