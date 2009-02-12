@@ -192,13 +192,13 @@ class ___PHPShell___ {
         if ($do_color) {
           echo "\033[36m"; // cyan
         }
-        if ($evalue === true) {
-          echo "true";
-        } elseif ($evalue === false) {
-          echo "false";
-        } else {
+
+        if (null === $evalue || is_scalar($evalue) || is_array($evalue)) {
           var_export($evalue);
+        } else {
+          print_r($evalue);
         }
+
         // set $_ to be the value of the last evaluated expression
         $_ = $evalue;
       }
