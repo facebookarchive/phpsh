@@ -98,7 +98,7 @@ class ___PHPShell___ {
     $this->__send_autocomplete_identifiers($do_autocomplete);
 
     // now it's safe to send any output the includes generated
-    print $output_from_includes;
+    echo $output_from_includes;
     fwrite($this->_comm_handle, "ready\n");
 
     $this->_interactive_loop($do_color);
@@ -120,7 +120,7 @@ class ___PHPShell___ {
    */
   function __send_autocomplete_identifiers($do_autocomplete) {
     // send special string to signal that we're sending the autocomplete identifiers
-    print "#start_autocomplete_identifiers\n";
+    echo "#start_autocomplete_identifiers\n";
 
     if ($do_autocomplete) {
       // send function names -- both user defined and built-in
@@ -135,7 +135,7 @@ class ___PHPShell___ {
       foreach (array_merge($defined_functions['user'], $defined_functions['internal'], array_keys($GLOBALS), array_keys(get_defined_constants()), $classes, get_declared_interfaces(), $methods, array('instanceof')) as $identifier) {
         // exclude the phpshell internal variables from the autocomplete list
         if ((substr($identifier, 0, 14) != "___phpshell___") && ($identifier != '___PHPShell___')) {
-          print "$identifier\n";
+          echo "$identifier\n";
         } else {
           unset($$identifier);
         }
@@ -143,7 +143,7 @@ class ___PHPShell___ {
     }
 
     // string signalling the end of autocmplete identifiers
-    print "#end_autocomplete_identifiers\n";
+    echo "#end_autocomplete_identifiers\n";
   }
 
 
@@ -171,7 +171,7 @@ class ___PHPShell___ {
 
       // evaluate what the user's entered
       if ($do_color) {
-        print "\033[33m"; // yellow
+        echo "\033[33m"; // yellow
       }
       try {
         $evalue = eval($buffer);
@@ -183,30 +183,31 @@ class ___PHPShell___ {
         $evalue = null;
       }
 
-      if ($buffer != "xdebug_break();\n")
+      if ($buffer != "xdebug_break();\n") {
         PHPShell__eval_completed();
+      }
 
-      // if any value was returned by the evaluated code, print it
+      // if any value was returned by the evaluated code, echo it
       if (isset($evalue)) {
         if ($do_color) {
-          print "\033[36m"; // cyan
+          echo "\033[36m"; // cyan
         }
-        if ($evalue === true) {
-          print "true";
-        } elseif ($evalue === false) {
-          print "false";
+
+        if (null === $evalue || is_scalar($evalue)) {
+          var_export($evalue);
         } else {
           print_r($evalue);
         }
+
         // set $_ to be the value of the last evaluated expression
         $_ = $evalue;
       }
       // back to normal for prompt
       if ($do_color) {
-        print "\033[0m";
+        echo "\033[0m";
       }
       // newline so we end cleanly
-      print "\n";
+      echo "\n";
     }
   }
 }
