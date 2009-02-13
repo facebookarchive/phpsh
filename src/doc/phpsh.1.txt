@@ -226,6 +226,15 @@ ProxyPort::
   9002 and 9998. If DebugClient is also unset or set to "emacs", the proxy 
   will configure emacs PHP debug client to listen on the next port up.
 
+X11::
+  If set to "yes", phpsh looks at the value of DISPLAY environment variable to
+  determine how it should start debug client. If DISPLAY is set, debug
+  client is started in a separate X window, otherwise it is started
+  without X support in the terminal where phpsh is running. If this
+  option is set to "no", debug client will always be started in
+  terminal. If set to "require", debug client will not be started
+  unless DISPLAY is set. Default is "yes".
+
 Help::
   This option works only if DebugClient is unset or set to "emacs". If
   set to "yes", when emacs starts it will show a help screen for its PHP 

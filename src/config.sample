@@ -34,13 +34,13 @@
 #  will configure emacs to listen on the next port up.
 
 #X11: yes
-#  If set to "yes", phpsh looks at the value of DISPLAY variable to determine
-#  how it should start debug client, such as Emacs. If DISPLAY is set, debug
-#  client is started in a separate X window, otherwise it is started without
-#  X support in the terminal where phpsh is running. If this option is set to
-#  "no", debug client will always be started in the terminal. If set to
-#  "require", debug client will not be started unless DISPLAY is set. Default
-#  is "yes".
+#  If set to "yes", phpsh looks at the value of DISPLAY environment variable 
+#  to determine how it should start debug client, such as Emacs. If DISPLAY 
+#  is set, debug client is started in a separate X window, otherwise it is 
+#  started without X support in the terminal where phpsh is running. If this 
+#  option is set to "no", debug client will always be started in the terminal. 
+#  If set to "require", debug client will not be started unless DISPLAY is set. 
+#  Default is "yes".
 
 #Help: no
 #  This option works only if DebugClient is unset or set to "emacs". If

@@ -1,0 +1,474 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="generator" content="AsciiDoc 8.2.7">
+<title>phpsh</title>
+</head>
+<body>
+<hr />
+<h1>
+    phpsh(1) Manual Page
+</h1>
+<hr />
+<h2>NAME</h2>
+<p>phpsh -
+   an interactive shell into a php codebase
+</p>
+<h2>SYNOPSIS</h2>
+<blockquote>
+<pre style="font-family: inherit;"><b>phpsh</b> [-h] [-c | --codebase-mode] [-t | --test-file]
+      [-A | --no-autocomplete] [-C | --no-color] [-M | --no-multiline]
+      [-T | --no-ctags] [-X | --no-xdebug] [extra-includes&#8230;]</pre>
+<p align="left">
+</p>
+</blockquote>
+<h2><a name="_description"></a>DESCRIPTION</h2>
+<p>phpsh starts and controls a command line PHP interpreter. You can load
+arbitrary PHP files and pass expressions to the interpreter to evaluate.
+Beginning with version 1.2 phpsh also supports PHP debugging with xdebug.</p>
+<p>Type php commands and they will be evaluted each time you hit enter. Ex:</p>
+<pre>php&gt; $msg = "hello world"</pre>
+<p>Put = at the beginning of a line as syntactic sugar for return. Ex:</p>
+<pre>php&gt; = 2 + 2
+4</pre>
+<p>phpsh will print any returned value (in yellow) and also assign the last
+returned value to the variable $_.  Anything printed to stdout shows up blue,
+and anything sent to stderr shows up red.</p>
+<p>You can enter multiline input, such as a multiline if statement.  phpsh will
+accept further lines until you complete a full statement, or it will error if
+your partial statement has no syntactic completion.  You may also use ^C to
+cancel a partial statement.</p>
+<p>You can use tab to autocomplete function names, global variable names,
+constants, classes, and interfaces.  If you are using ctags, then you can hit
+tab again after you've entered the name of a function, and it will show you
+the signature for that function.  phpsh also supports all the normal
+readline features, like ctrl-e, ctrl-a, and history (up, down arrows).</p>
+<p>Note that stdout and stderr from the underlying php process are line-buffered;
+so  php&gt; for ($i = 0; $i &lt; 3; $i++) {echo "."; sleep(1);}
+will print the three dots all at once after three seconds.
+(echo ".\n" would print one a second.)</p>
+<h2><a name="_options"></a>OPTIONS</h2>
+<dl>
+<dt><b>
+-c
+</b></dt>
+<dt><b>
+--codebase-mode
+</b></dt>
+<dd>
+<p>
+        Use "-c none" to load no codebase. See /etc/phpsh/phpshrc.php for
+        other codebase modes.
+</p>
+</dd>
+<dt><b>
+-t
+</b></dt>
+<dt><b>
+--test-file
+</b></dt>
+<dd>
+<p>
+        Run a saved-phpsh-session unit test file. See test/ in the phpsh
+        distribution for examples.
+</p>
+</dd>
+<dt><b>
+-A
+</b></dt>
+<dt><b>
+--no-autocomplete
+</b></dt>
+<dd>
+<p>
+        Disable identifier autocomplete.
+</p>
+</dd>
+<dt><b>
+-C
+</b></dt>
+<dt><b>
+--no-color
+</b></dt>
+<dd>
+<p>
+        Do not try to change color for different types of output.
+</p>
+</dd>
+<dt><b>
+-M
+</b></dt>
+<dt><b>
+--no-multiline
+</b></dt>
+<dd>
+<p>
+        Disable support for multiline input.
+</p>
+</dd>
+<dt><b>
+-T
+</b></dt>
+<dt><b>
+--no-ctags
+</b></dt>
+<dd>
+<p>
+        Do not run ctags to index the code base.
+</p>
+</dd>
+<dt><b>
+-X
+</b></dt>
+<dt><b>
+--no-xdebug
+</b></dt>
+<dd>
+<p>
+        Do not load xdebug, disable PHP debugging support.
+</p>
+</dd>
+</dl>
+<h2><a name="_commands"></a>COMMANDS</h2>
+<dl>
+<dt><b>
+h
+</b></dt>
+<dd>
+<p>
+      Display a help text.
+</p>
+</dd>
+<dt><b>
+r [files&#8230;]
+</b></dt>
+<dd>
+<p>
+      Reload (e.g. after a code change).  args to r append to add
+      includes, like: php&gt; r ../lib/username.php
+      (use absolute paths or relative paths from where you start phpsh)
+</p>
+</dd>
+<dt><b>
+R [files&#8230;]
+</b></dt>
+<dd>
+<p>
+      Like <b>r</b>, but change includes instead of appending.
+</p>
+</dd>
+<dt><b>
+d identifier
+</b></dt>
+<dd>
+<p>
+      Get documentation for a function or other identifier.
+      ex: php&gt; d my_function
+</p>
+</dd>
+<dt><b>
+D identifier
+</b></dt>
+<dd>
+<p>
+      Like <b>d</b>, but gives more extensive documentation for builtins.
+</p>
+</dd>
+<dt><b>
+v identifier
+</b></dt>
+<dd>
+<p>
+      Open vim read-only where a function or other identifer is defined.
+      ex: php&gt; v some_function
+</p>
+</dd>
+<dt><b>
+V identifier
+</b></dt>
+<dd>
+<p>
+      Open vim (not read-only) and reload (r) upon return to phpsh.
+</p>
+</dd>
+<dt><b>
+e identifier
+</b></dt>
+<dd>
+<p>
+      Open emacs where a function or other identifer is defined.
+      ex: php&gt; e some_function
+</p>
+</dd>
+<dt><b>
+x [=]function([args])
+</b></dt>
+<dd>
+<p>
+       Execute function() with args under debugger (xdebug).
+      Currently geben for emacs is the only debug client supported. This
+      command requires X11.
+</p>
+</dd>
+<dt><b>
+c [files&#8230;]
+</b></dt>
+<dd>
+<p>
+      Append new includes without restarting; display includes.
+</p>
+</dd>
+<dt><b>
+C [files&#8230;]
+</b></dt>
+<dd>
+<p>
+      Change includes without restarting; display includes.
+</p>
+</dd>
+<dt><b>
+!
+</b></dt>
+<dd>
+<p>
+      Execute a shell command.
+      ex: php&gt; ! pwd
+</p>
+</dd>
+<dt><b>
+q
+</b></dt>
+<dd>
+<p>
+     Quit (ctrl-D also quits)
+</p>
+</dd>
+</dl>
+<h2><a name="_debugging"></a>DEBUGGING</h2>
+<h3><a name="_requirements"></a>Requirements</h3>
+<p>Beginning with version 1.2 phpsh supports interactive PHP debugging
+via Xdebug (<a href="http://xdebug.org/">http://xdebug.org/</a>). If you want to debug PHP code from
+phpsh, you will need xdebug.so compiled for your PHP version and build
+type (debug or nodebug) and installed in the PHP extensions directory
+or in a location given by Xdebug configuration variable (see
+below). The default configuration currently requires X Windows and
+debugclient, a simple Xdebug protocol client distributed with
+xdebug. See XdebugClientPath configuration setting below for details.</p>
+<h3><a name="_starting_a_debugger"></a>Starting a debugger</h3>
+<p>The <strong>x</strong> command starts debugging of the specified function call in the
+current phpsh execution environment. Unless configured otherwise,
+phpsh will try to start emacs and load geben PHP debugging frontend
+<a href="http://code.google.com/p/geben-on-emacs/">http://code.google.com/p/geben-on-emacs/</a>. Emacs appearance can be
+customized through configuration settings described below.</p>
+<h3><a name="_debugging_session"></a>Debugging session</h3>
+<p>The execution stops at the first line of function, geben and xdebug
+module in PHP take over control over the function execution. All basic
+interactive debugging actions, such as stepping through lines, setting
+breakpoints, entering functions, examining variables, are
+supported. Debugging session terminates as soon as the function
+returns control to phpsh. The default behavior at that point is to
+minimize Emacs without closing it, this can be customized through
+configuration settings in [Emacs] section of the phpsh config
+file. All breakpoints set during debugging session are saved by geben
+and will be set automatically when the next debugging session
+starts. If Emacs is terminated by user, all breakpoints set so far are
+lost. When phpsh exits it kills its Emacs process if one is running.</p>
+<h3><a name="_other_debug_clients"></a>Other debug clients</h3>
+<p>If ClientPort is set, phpsh will expect an external xdebug client to listen
+on that port and will try to connect to the client. If connection is successful,
+phpsh will not attempt to start emacs, but will be using the client as the
+debugging frontend. This can be used, for example, to run debugging from phpsh
+without X Windows by starting emacs with geben manually in another terminal.</p>
+<h2><a name="_configuration"></a>CONFIGURATION</h2>
+<p>Config file support was added in phpsh-1.2. When phpsh starts up it
+tries to read its configuration from /etc/phpsh/config, then from
+$HOME/.phpsh/config. If either file is not present or not readable, it
+is ignored. Entries in the per-user config file $HOME/.phpsh/config
+override the corresponding entries in the host-wide config file
+/etc/phpsh/config.</p>
+<p>The config file consists of sections containing key:value pairs.
+Lines starting with # are ignored. All settings are optional and have
+reasonable default values. Section names are in brackets. A section
+name must be present in the config file if any settings in that
+section are present. The following configuration settings are
+supported:</p>
+<h3><a name="_debugging_2"></a>[Debugging]</h3>
+<dl>
+<dt><b>
+Xdebug
+</b></dt>
+<dd>
+<p>
+    Location of xdebug.so, a debugging extension for the Zend
+    engine. By default phpsh will look for xdebug.so in the
+    extensions directory reported by php-config. Set to "no" (without
+    quotes) to disable loading xdebug into php VM. This will disable
+    all debugging support and will stop all warning messages related
+    to debugging.
+</p>
+</dd>
+<dt><b>
+DebugClient
+</b></dt>
+<dd>
+<p>
+  Command to run to start an xdebug client. Default is "emacs", which starts
+  emacs under X and loads Geben, an xdebug frontend written in Emacs lisp.
+</p>
+</dd>
+<dt><b>
+ClientTimeout
+</b></dt>
+<dd>
+<p>
+  Number of seconds to wait for debug client to start up and begin listening
+  for xdebug connections. Default is 60. If set to "none", 0 or a negative
+  number phpsh will wait until killed.
+</p>
+</dd>
+<dt><b>
+ClientHost
+</b></dt>
+<dd>
+<p>
+  Name of host on which debug client is running. You should not set this
+  unless you are running your own debug client. Default is localhost.
+</p>
+</dd>
+<dt><b>
+ClientPort
+</b></dt>
+<dd>
+<p>
+  Port on which the debug client listens for xdebug connections. By default
+  ProxyPort+1 is used.
+</p>
+</dd>
+<dt><b>
+ProxyPort
+</b></dt>
+<dd>
+<p>
+  The port on which the proxy should listen for xdebug connections. By default
+  the proxy will use the lowest available even-numbered port between
+  9002 and 9998. If DebugClient is also unset or set to "emacs", the proxy
+  will configure emacs PHP debug client to listen on the next port up.
+</p>
+</dd>
+<dt><b>
+X11
+</b></dt>
+<dd>
+<p>
+  If set to "yes", phpsh looks at the value of DISPLAY environment variable to
+  determine how it should start debug client. If DISPLAY is set, debug
+  client is started in a separate X window, otherwise it is started
+  without X support in the terminal where phpsh is running. If this
+  option is set to "no", debug client will always be started in
+  terminal. If set to "require", debug client will not be started
+  unless DISPLAY is set. Default is "yes".
+</p>
+</dd>
+<dt><b>
+Help
+</b></dt>
+<dd>
+<p>
+  This option works only if DebugClient is unset or set to "emacs". If
+  set to "yes", when emacs starts it will show a help screen for its PHP
+  debugging mode. If set to "no", a help file will be loaded into an Emacs
+  buffer but will not be displayed on startup. Default is "no".
+</p>
+</dd>
+<dt><b>
+LogDBGp
+</b></dt>
+<dd>
+<p>
+  If "yes", debug proxy will log DBGp (xdebug protocol) messages to
+  file dbgp.log in the current directory. Defaul is "no".
+</p>
+</dd>
+</dl>
+<h3><a name="_emacs"></a>[Emacs]</h3>
+<p>The following options control the appearance of Emacs debug client.
+They take effect only if DebugClient option above is set to "emacs" or left
+unset.</p>
+<dl>
+<dt><b>
+ForegroundColor
+</b></dt>
+<dd>
+<p>
+  Foreground color of default typeface. Default is black.
+</p>
+</dd>
+<dt><b>
+BackgroundColor
+</b></dt>
+<dd>
+<p>
+  Background color of default typeface when a debugging session is in
+  progress. Default is white.
+</p>
+</dd>
+<dt><b>
+InactiveColor
+</b></dt>
+<dd>
+<p>
+  Background color of default typeface when Emacs window is inactive (no
+  debugging in progress). Default is grey75.
+</p>
+</dd>
+<dt><b>
+InactiveMinimize
+</b></dt>
+<dd>
+<p>
+  If set to "yes", minimize (iconify) Emacs window upon completion of
+  debugging session. Restore (deiconify) window when next session begins.
+  Default is "yes". On some X servers Emacs fails to deiconify correctly.
+  If that's the case for you, set this to "no".
+</p>
+</dd>
+<dt><b>
+FontFamily
+</b></dt>
+<dd>
+<p>
+  Font family to use for default Emacs face. If not set, Emacs defaults are
+  used.
+</p>
+</dd>
+<dt><b>
+FontSize
+</b></dt>
+<dd>
+<p>
+  Font size in points for default Emacs face. If unset, Emacs defaults are used.
+</p>
+</dd>
+<dt><b>
+XdebugClientPath
+</b></dt>
+<dd>
+<p>
+  Emacs debug client, geben, uses a simple command-line debug client, aptly
+  called debugclient, a part of xdebug package. This setting controls
+  the location that Emacs should use to start debugclient. Default is just
+  to pass "debugclient" to shell.
+</p>
+</dd>
+</dl>
+<h2><a name="_author"></a>Author</h2>
+<p>Written by Charles Chiever and Dan Corson <a href="mailto:phpsh@facebook.com">phpsh@facebook.com</a></p>
+<p>PHP debugging and configuration support added by Mark Marchukov</p>
+<p></p>
+<p></p>
+<hr /><p><small>
+Last updated 2008-11-25 21:10:29 PDT
+</small></p>
+</body>
+</html>

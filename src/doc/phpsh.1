@@ -165,6 +165,9 @@ Port on which the debug client listens for xdebug connections\&. By default Prox
 ProxyPort
 The port on which the proxy should listen for xdebug connections\&. By default the proxy will use the lowest available even\-numbered port between 9002 and 9998\&. If DebugClient is also unset or set to "emacs", the proxy will configure emacs PHP debug client to listen on the next port up\&.
 .TP
+X11
+If set to "yes", phpsh looks at the value of DISPLAY environment variable to determine how it should start debug client\&. If DISPLAY is set, debug client is started in a separate X window, otherwise it is started without X support in the terminal where phpsh is running\&. If this option is set to "no", debug client will always be started in terminal\&. If set to "require", debug client will not be started unless DISPLAY is set\&. Default is "yes"\&.
+.TP
 Help
 This option works only if DebugClient is unset or set to "emacs"\&. If set to "yes", when emacs starts it will show a help screen for its PHP debugging mode\&. If set to "no", a help file will be loaded into an Emacs buffer but will not be displayed on startup\&. Default is "no"\&.
 .TP

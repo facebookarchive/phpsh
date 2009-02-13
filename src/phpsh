@@ -147,7 +147,7 @@ while True:
             if debug_funcall:
                 if s.setup_debug_client(line_ready):
                     s.do_expr("xdebug_break();\n")
-                    s.do_expr(line_ready)
+                    s.do_expr(line_ready, True)
             else:
                 s.do_expr(line_ready)
         new_expr = True

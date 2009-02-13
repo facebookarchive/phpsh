@@ -233,6 +233,7 @@ class PhpshState:
         self.p_dbgp = None; # debugging proxy
         self.dbgp_port = 9000; # default port on which dbgp proxy listens
         self.temp_file_name = tempfile.mktemp()
+        self.output_tempfile = None # tempfile to buffer php output
         self.with_xdebug = with_xdebug;
         self.verbose = verbose
         self.xdebug_path = None # path to xdebug.so read from config file
@@ -483,9 +484,20 @@ class PhpshState:
     def print_warning(self, msg):
        print self.clr_announce + msg + self.clr_default
 
-    def do_expr(self, expr):
+    # pass expr to php for evaluation, wait for completion
+    # if debug_funcall is True, the expression is being run under
+    # debugger.
+    def do_expr(self, expr, debug_funcall=False):
+        defer_output = debug_funcall and \
+                       (not os.getenv('DISPLAY') or \
+                        self.config.get_option("Debugging", "X11") == "no")
+        # if we are executing a function call under debugger and debug
+        # client is running in the same terminal as phpsh, do not print
+        # the output we get from php in terminal until evaluation is done
+        # and debug client exits, so that we do not mess up the debug
+        # client UI.
         self.p.stdin.write(expr)
-        self.wait_for_comm_finish()
+        self.wait_for_comm_finish(defer_output)
         return self.result
 
     def wait_on_ready(self):
@@ -566,8 +578,18 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
                 break
             self.autocomplete_identifiers.append(p_line)
 
-    def wait_for_comm_finish(self):
+    def wait_for_comm_finish(self, defer_output=False):
         try:
+            if defer_output:
+              if self.output_tempfile:
+                 self.output_tempfile.truncate(0)
+              else:
+                 self.output_tempfile = tempfile.TemporaryFile()
+              out = self.output_tempfile
+              err = self.output_tempfile
+            else:
+              out = sys.stdout
+              err = sys.stderr
             # wait for signal that php command is done
             # keep checking for death
             out_buff = ["", ""]
@@ -618,10 +640,10 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
                             self.result += l
                             if self.do_echo:
                                 if r is self.p.stdout:
-                                    sys.stdout.write(l)
+                                    out.write(l)
                                 else:
                                     l = self.clr_err + l + self.clr_default
-                                    sys.stderr.write(l)
+                                    err.write(l)
                             out_buff[out_buff_i] = out_buff[out_buff_i][last_nl_pos + 1:]
                 # don't sleep if the command is already done
                 # (even tho sleep period is small; maximize responsiveness)
@@ -629,12 +651,19 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
                     break
                 time.sleep(comm_poll_timeout)
 
+            if defer_output and self.output_tempfile.tell() > 0:
+               self.output_tempfile.seek(0, os.SEEK_SET)
+               for line in self.output_tempfile: print line
+
             if died:
                 self.show_incs("PHP died. ")
                 self.php_open_and_check()
 
         except KeyboardInterrupt:
             self.show_incs("Interrupt! ")
+            if defer_output and self.output_tempfile.tell() > 0:
+               self.output_tempfile.seek(0, os.SEEK_SET)
+               for line in self.output_tempfile: print line
             self.php_restart()
 
     def show_incs(self, pre_str="", restart=True, start=False):
