@@ -39,7 +39,7 @@ $___phpsh___do_autocomplete = true;
 $___phpsh___options_possible = true;
 foreach (array_slice($GLOBALS['argv'], 3) as $___phpsh___arg) {
   $___phpsh___did_arg = false;
-  if ($___phpll___options_possible) {
+  if ($___phpsh___options_possible) {
     switch ($___phpsh___arg) {
     case '-c':
       $___phpsh___do_color = false;
