@@ -464,13 +464,13 @@ class DebugSession:
         """This function must be called when php just executed the initial xdebug_break() call that starts a new debugging session and the initial <break> message has been received from xdebug. setup() verifies that the function call being debugged is valid. If it is, a debug client is started and its view is set to display the first line of function. If the function call is invalid, for example, the function name cannot be found, setup() throws an Exception"""
 
         # set a breakpoint on the function being debugged and on
-        # PHPShell__eval_completed(), which phpsh.php will execute
+        # ___phpsh___eval_completed(), which phpsh.php will execute
         # right after the eval(), continue PHP execution
 
         debug_log("setting up debug session")
 
         funbp = self.xdebug.set_breakpoint(self.function)
-        donebp = self.xdebug.set_breakpoint('PHPShell__eval_completed')
+        donebp = self.xdebug.set_breakpoint('___phpsh___eval_completed')
         self.xdebug.run()
 
         filename = None
@@ -480,8 +480,8 @@ class DebugSession:
 
         if not filename.startswith("file://") or \
            filename.endswith("/phpsh.php"):
-            # Execution stopped at PHPShell__eval_completed() or in the eval().
-            # Abort the session.
+            # Execution stopped at ___phpsh___eval_completed() or in the
+            # eval(). Abort the session.
             self.client = None
             raise Exception, "Invalid PHP function call"
 
@@ -694,7 +694,7 @@ class PhpshDebugProxy:
                             filename = dbgp_get_filename(res)
                             if filename and filename.endswith("/phpsh.php"):
                                 # there is a bug in xdebug where it breaks
-                                # on PHPShell__eval_completed() after the
+                                # on ___phpsh___eval_completed() after the
                                 # breakpoint on that function was removed. This
                                 # happens only if we reach the function via
                                 # a "step out" command. Compensate by sending
