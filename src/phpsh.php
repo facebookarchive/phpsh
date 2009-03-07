@@ -69,7 +69,7 @@ ob_end_clean();
 // enough to tweak it.
 if (!function_exists('___phpsh___pretty_print')) {
   function ___phpsh___pretty_print($x) {
-    return ___phpsh___parse_dump(___phpsh___var_dump_cap($x));
+    return ___phpsh___parse_dump($x, ___phpsh___var_dump_cap($x));
   }
   function ___phpsh___var_dump_cap($x) {
     ob_start();
@@ -85,7 +85,7 @@ if (!function_exists('___phpsh___pretty_print')) {
     //        is hex kwlr in general?  if so might want our own escaper here
     return '"'.addcslashes($str, $str_lit_esc_chars).'"';
   }
-  function ___phpsh___parse_dump($dump, &$pos=0, $normal_end_check=true,
+  function ___phpsh___parse_dump($x, $dump, &$pos=0, $normal_end_check=true,
       $_depth=0) {
     static $indent_str = '  ';
     $depth_str = str_repeat($indent_str, $_depth);
@@ -103,7 +103,7 @@ if (!function_exists('___phpsh___pretty_print')) {
       ___phpsh___parse_dump_assert($dump, $pos, 'array');
       $arr_len = (int)___phpsh___parse_dump_delim_grab($dump, $pos, false);
       ___phpsh___parse_dump_assert($dump, $pos, " {\n");
-      $arr_lines = ___phpsh___parse_dump_arr_lines($dump, $pos, $arr_len,
+      $arr_lines = ___phpsh___parse_dump_arr_lines($x, $dump, $pos, $arr_len,
         $_depth, $depth_str, $indent_str);
       ___phpsh___parse_dump_assert($dump, $pos, $depth_str."}",
         $normal_end_check);
@@ -119,7 +119,7 @@ if (!function_exists('___phpsh___pretty_print')) {
         ___phpsh___parse_dump_delim_grab($dump, $pos, false, '# ');
       $obj_len = (int)___phpsh___parse_dump_delim_grab($dump, $pos);
       ___phpsh___parse_dump_assert($dump, $pos, " {\n");
-      $obj_lines = ___phpsh___parse_dump_arr_lines($dump, $pos, $obj_len,
+      $obj_lines = ___phpsh___parse_dump_obj_lines($x, $dump, $pos, $obj_len,
         $_depth, $depth_str, $indent_str);
       ___phpsh___parse_dump_assert($dump, $pos, $depth_str.'}',
         $normal_end_check);
@@ -164,21 +164,42 @@ if (!function_exists('___phpsh___pretty_print')) {
         substr($dump, $pos));
     }
   }
-  function ___phpsh___parse_dump_arr_lines($dump, &$pos, $arr_len, $depth,
+  function ___phpsh___parse_dump_arr_lines($x, $dump, &$pos, $arr_len, $depth,
       $depth_str, $indent_str) {
     $arr_lines = array();
-    for ($i = 0; $i < $arr_len; $i++) {
-      ___phpsh___parse_dump_assert($dump, $pos, $depth_str.$indent_str);
-      $key = ___phpsh___parse_dump_delim_grab($dump, $pos, false, '[]');
-      if ($key[0] == '"') {
-        $key = ___phpsh___str_lit(substr($key, 1, strlen($key) - 2));
+    foreach (array_keys($x) as $key) {
+      if (is_int($key)) {
+        $key_str_php = (string)$key;
+        $key_str_correct = $key_str_php;
+      } else {
+        $key_str_php = '"'.$key.'"';
+        $key_str_correct = ___phpsh___str_lit($key);
       }
-      ___phpsh___parse_dump_assert($dump, $pos, "=>\n".$depth_str.$indent_str);
+      ___phpsh___parse_dump_assert($dump, $pos, $depth_str.$indent_str.'['.
+        $key_str_php.']=>'."\n".$depth_str.$indent_str);
       if ($dump[$pos] == '*') {
         ___phpsh___parse_dump_assert($dump, $pos, '*RECURSION*');
         $val = '*RECURSION*';
       } else {
-        $val = ___phpsh___parse_dump($dump, $pos, false, $depth + 1);
+        $val = ___phpsh___parse_dump($x[$key], $dump, $pos, false, $depth + 1);
+      }
+      ___phpsh___parse_dump_assert($dump, $pos, "\n");
+      $arr_lines[] = $depth_str.$indent_str.$key_str_correct.' => '.$val.',';
+    }
+    return $arr_lines;
+  }
+  function ___phpsh___parse_dump_obj_lines($x, $dump, &$pos, $arr_len, $depth,
+      $depth_str, $indent_str) {
+    $arr_lines = array();
+    for ($i = 0; $i < $arr_len; $i++) {
+      ___phpsh___parse_dump_assert($dump, $pos, $depth_str.$indent_str.'[');
+      $key = ___phpsh___parse_dump_delim_grab($dump, $pos, false, '""');
+      ___phpsh___parse_dump_assert($dump, $pos, "]=>\n".$depth_str.$indent_str);
+      if ($dump[$pos] == '*') {
+        ___phpsh___parse_dump_assert($dump, $pos, '*RECURSION*');
+        $val = '*RECURSION*';
+      } else {
+        $val = ___phpsh___parse_dump($x->$key, $dump, $pos, false, $depth + 1);
       }
       ___phpsh___parse_dump_assert($dump, $pos, "\n");
       $arr_lines[] = $depth_str.$indent_str.$key.' => '.$val.',';
@@ -218,45 +239,80 @@ if (!function_exists('___phpsh___pretty_print')) {
   }
   // this is provided for our in-house unit testing and in case it's useful to
   // anyone modifying the default pretty-printer
-  function ___phpsh___parse_dump_test() {
+  function ___phpsh___assert_eq(&$i, $f, $x, $y) {
+    $f_of_x = $f($x);
+    if ($y === $f_of_x) {
+      $i++;
+      return true;
+    } else {
+      error_log('Expected '.$f.'('.print_r($x, true).') to be '.
+        print_r($y, true).', but instead got '.print_r($f_of_x, true));
+      return false;
+    }
+  }
+  function ___phpsh___assert_re(&$i, $f, $x, $re) {
+    $f_of_x = $f($x);
+    if (1 === preg_match($re, $f_of_x)) {
+      $i++;
+      return true;
+    } else {
+      error_log('Expected '.$f.'('.print_r($x, true).') to match re '.$re.
+        ', but instead got '.print_r($f_of_x, true));
+      return false;
+    }
+  }
+  function ___phpsh___pretty_print_test() {
     $i = 0;
-    assert(___phpsh___parse_dump(___phpsh___var_dump_cap(null)) == 'null');
-    $i++;
-    assert(___phpsh___parse_dump(___phpsh___var_dump_cap(true)) == 'true');
-    $i++;
-    assert(___phpsh___parse_dump(___phpsh___var_dump_cap(false)) == 'false');
-    $i++;
-    assert(___phpsh___parse_dump(___phpsh___var_dump_cap(4)) == '4');
-    $i++;
-    assert(___phpsh___parse_dump(___phpsh___var_dump_cap(3.14)) == '3.14');
-    $i++;
-    assert(___phpsh___parse_dump(___phpsh___var_dump_cap("A\\\"'\'B\nC")) ==
-      '"A\\\\\"\'\\\\\'B\\nC"');
-    $i++;
-    assert(1 === preg_match('<resource #\d+ of type stream>',
-      ___phpsh___parse_dump(___phpsh___var_dump_cap(
-      fopen('phpshtest.deleteme', 'w')))));
-    $i++;
-    assert(___phpsh___parse_dump(___phpsh___var_dump_cap(
-      array(04 => 'lol', '04' => 'lolo'))) ===
-      "array(\n  4 => \"lol\",\n  \"04\" => \"lolo\",\n)");
-    $i++;
+    assert(___phpsh___assert_eq($i, '___phpsh___pretty_print',
+      null,
+      'null'
+      ));
+    assert(___phpsh___assert_eq($i, '___phpsh___pretty_print',
+      true,
+      'true'
+      ));
+    assert(___phpsh___assert_eq($i, '___phpsh___pretty_print',
+      false,
+      'false'
+      ));
+    assert(___phpsh___assert_eq($i, '___phpsh___pretty_print',
+      4,
+      '4'
+      ));
+    assert(___phpsh___assert_eq($i, '___phpsh___pretty_print',
+      3.14,
+      '3.14'
+      ));
+    assert(___phpsh___assert_eq($i, '___phpsh___pretty_print',
+      "A\\\"'\'B\nC",
+      '"A\\\\\"\'\\\\\'B\\nC"'
+      ));
+    assert(___phpsh___assert_re($i, '___phpsh___pretty_print',
+      fopen('phpshtest.deleteme', 'w'),
+      '<resource #\d+ of type stream>'
+      ));
+    assert(___phpsh___assert_eq($i, '___phpsh___pretty_print',
+      array(04 => 'lol', '04' => 'lolo'),
+      "array(\n  4 => \"lol\",\n  \"04\" => \"lolo\",\n)"
+      ));
     $arr = array();
     $arr['self'] = $arr;
     // note the manifested depth might actually be variable and unknowable.
     // so we may have to loosen this test..
-    assert(___phpsh___parse_dump(___phpsh___var_dump_cap($arr)) ===
+    assert(___phpsh___assert_eq($i, '___phpsh___pretty_print', $arr,
       "array(\n  \"self\" => array(\n    \"self\" => *RECURSION*,\n  ),\n)"
-    );
-    $i++;
+      ));
     $arr = array();
     $arr['fake'] = "Array\n *RECURSION*";
     $arr['sref'] = &$arr;
     $arr['self'] = $arr;
-    assert(___phpsh___parse_dump(___phpsh___var_dump_cap($arr)) ===
+    assert(___phpsh___assert_eq($i, '___phpsh___pretty_print', $arr,
       "array(\n  \"fake\" => \"Array\\n *RECURSION*\",\n  \"sref\" => &array(\n    \"fake\" => \"Array\\n *RECURSION*\",\n    \"sref\" => &array(\n      \"fake\" => \"Array\\n *RECURSION*\",\n      \"sref\" => *RECURSION*,\n      \"self\" => array(\n        \"fake\" => \"Array\\n *RECURSION*\",\n        \"sref\" => *RECURSION*,\n        \"self\" => array(\n          \"fake\" => \"Array\\n *RECURSION*\",\n          \"sref\" => *RECURSION*,\n          \"self\" => *RECURSION*,\n        ),\n      ),\n    ),\n    \"self\" => array(\n      \"fake\" => \"Array\\n *RECURSION*\",\n      \"sref\" => &array(\n        \"fake\" => \"Array\\n *RECURSION*\",\n        \"sref\" => *RECURSION*,\n        \"self\" => array(\n          \"fake\" => \"Array\\n *RECURSION*\",\n          \"sref\" => *RECURSION*,\n          \"self\" => *RECURSION*,\n        ),\n      ),\n      \"self\" => array(\n        \"fake\" => \"Array\\n *RECURSION*\",\n        \"sref\" => &array(\n          \"fake\" => \"Array\\n *RECURSION*\",\n          \"sref\" => *RECURSION*,\n          \"self\" => *RECURSION*,\n        ),\n        \"self\" => *RECURSION*,\n      ),\n    ),\n  ),\n  \"self\" => array(\n    \"fake\" => \"Array\\n *RECURSION*\",\n    \"sref\" => &array(\n      \"fake\" => \"Array\\n *RECURSION*\",\n      \"sref\" => &array(\n        \"fake\" => \"Array\\n *RECURSION*\",\n        \"sref\" => *RECURSION*,\n        \"self\" => array(\n          \"fake\" => \"Array\\n *RECURSION*\",\n          \"sref\" => *RECURSION*,\n          \"self\" => *RECURSION*,\n        ),\n      ),\n      \"self\" => array(\n        \"fake\" => \"Array\\n *RECURSION*\",\n        \"sref\" => &array(\n          \"fake\" => \"Array\\n *RECURSION*\",\n          \"sref\" => *RECURSION*,\n          \"self\" => *RECURSION*,\n        ),\n        \"self\" => *RECURSION*,\n      ),\n    ),\n    \"self\" => array(\n      \"fake\" => \"Array\\n *RECURSION*\",\n      \"sref\" => &array(\n        \"fake\" => \"Array\\n *RECURSION*\",\n        \"sref\" => &array(\n          \"fake\" => \"Array\\n *RECURSION*\",\n          \"sref\" => *RECURSION*,\n          \"self\" => *RECURSION*,\n        ),\n        \"self\" => *RECURSION*,\n      ),\n      \"self\" => *RECURSION*,\n    ),\n  ),\n)"
-      );
-    $i++;
+      ));
+    assert(___phpsh___assert_eq($i, '___phpsh___pretty_print',
+      array('a[b]c' => 4),
+      "array(\n  \"a[b]c\" => 4,\n)"
+    ));
     return $i;
   }
 }
