@@ -866,9 +866,10 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
     def write(self):
         try:
             readline.write_history_file(self.history_file)
-        except IOError:
+        except IOError, e:
             print >> sys.stderr, \
-                "Could not write history file.  No write permissions?"
+                "Could not write history file %s: %s" % \
+                (self.history_file, e)
 
     def close(self):
         self.write()
