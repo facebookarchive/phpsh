@@ -190,6 +190,8 @@ if (!function_exists('___phpsh___pretty_print')) {
   function ___phpsh___parse_dump_obj_lines($x, $dump, &$pos, $arr_len, $depth,
       $depth_str, $indent_str) {
     $arr_lines = array();
+    // this exposes private/protected members (a hack within a hack)
+    $x_arr = ___phpsh___obj_to_arr($x);
     for ($i = 0; $i < $arr_len; $i++) {
       ___phpsh___parse_dump_assert($dump, $pos, $depth_str.$indent_str.'[');
       $key = ___phpsh___parse_dump_delim_grab($dump, $pos, false, '""');
@@ -198,12 +200,32 @@ if (!function_exists('___phpsh___pretty_print')) {
         ___phpsh___parse_dump_assert($dump, $pos, '*RECURSION*');
         $val = '*RECURSION*';
       } else {
-        $val = ___phpsh___parse_dump($x->$key, $dump, $pos, false, $depth + 1);
+        $colon_pos = strpos($key, ':');
+        if ($colon_pos === false) {
+          $key_unannotated = $key;
+        } else {
+          $key_unannotated = substr($key, 0, $colon_pos);
+        }
+        $val = ___phpsh___parse_dump($x_arr[$key_unannotated], $dump, $pos,
+          false, $depth + 1);
       }
       ___phpsh___parse_dump_assert($dump, $pos, "\n");
       $arr_lines[] = $depth_str.$indent_str.$key.' => '.$val.',';
     }
     return $arr_lines;
+  }
+  function ___phpsh___obj_to_arr($x) {
+    $x_ser = serialize($x);
+    $x_ser = substr($x_ser, strpos($x_ser, ':', 3) + 1);
+    $x_ser = 'a'.substr($x_ser, strpos($x_ser, ':'));
+    $x_arr = array();
+    foreach (unserialize($x_ser) as $k => $v) {
+      if ($k[0] == "\000") {
+        $k = substr($k, strpos($k, "\000", 2) + 1);
+      }
+      $x_arr[$k] = $v;
+    }
+    return $x_arr;
   }
   function ___phpsh___parse_dump_assert($dump, &$pos, $str, $end=false) {
     $len = strlen($str);
