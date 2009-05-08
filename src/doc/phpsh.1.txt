@@ -8,8 +8,8 @@ phpsh - an interactive shell into a php codebase
 SYNOPSIS
 --------
 [verse]
-'phpsh' [-h] [-c | --codebase-mode] [-t | --test-file] 
-      [-A | --no-autocomplete] [-C | --no-color] [-M | --no-multiline] 
+'phpsh' [-h] [-c | --codebase-mode] [-t | --test-file]
+      [-A | --no-autocomplete] [-C | --no-color] [-M | --no-multiline]
       [-T | --no-ctags] [-X | --no-xdebug] [extra-includes...]
 
 DESCRIPTION
@@ -51,12 +51,12 @@ OPTIONS
 -------
 -c::
 --codebase-mode::
-        Use "-c none" to load no codebase. See /etc/phpsh/phpshrc.php for 
+        Use "-c none" to load no codebase. See /etc/phpsh/phpshrc.php for
         other codebase modes.
 
 -t::
 --test-file::
-        Run a saved-phpsh-session unit test file. See test/ in the phpsh 
+        Run a saved-phpsh-session unit test file. See test/ in the phpsh
         distribution for examples.
 
 -v::
@@ -90,7 +90,7 @@ h::
 
 r [files...]::
       Reload (e.g. after a code change).  args to r append to add
-      includes, like: php> r ../lib/username.php  
+      includes, like: php> r ../lib/username.php
       (use absolute paths or relative paths from where you start phpsh)
 
 R [files...]::
@@ -116,9 +116,8 @@ e identifier::
 
 x [=]function([args])::
        Execute function() with args under debugger (xdebug).
-      Currently geben for emacs is the only debug client supported. This
-      command requires X11.
-      
+       Currently geben for emacs is the only debug client supported.
+
 c [files...]::
       Append new includes without restarting; display includes.
 
@@ -152,7 +151,7 @@ The *x* command starts debugging of the specified function call in the
 current phpsh execution environment. Unless configured otherwise,
 phpsh will try to start emacs and load geben PHP debugging frontend
 http://code.google.com/p/geben-on-emacs/. Emacs appearance can be
-customized through configuration settings described below. 
+customized through configuration settings described below.
 
 Debugging session
 ~~~~~~~~~~~~~~~~~
@@ -164,14 +163,55 @@ supported. Debugging session terminates as soon as the function
 returns control to phpsh. The default behavior at that point is to
 minimize Emacs without closing it, this can be customized through
 configuration settings in [Emacs] section of the phpsh config
-file. All breakpoints set during debugging session are saved by geben
-and will be set automatically when the next debugging session
-starts. If Emacs is terminated by user, all breakpoints set so far are
-lost. When phpsh exits it kills its Emacs process if one is running.
+file. If debugging is done in a separate X window, all breakpoints
+set during debugging session are saved by geben and will be set
+automatically when the next debugging session starts. If Emacs is
+terminated by user, all breakpoints are lost. Breakpoints are also cleared
+at the end of each debugging session if debugging is run in the terminal
+because X is unavailable or terminal debugging is requested via the "X11"
+configuration option (see CONFIGURATION). When phpsh exits it kills its Emacs
+process if one is running.
+
+Geben debugger commands
+~~~~~~~~~~~~~~~~~~~~~~~
+
+g::
+     run
+i::
+     step into
+o::
+     step over
+r::
+     step out
+q::
+     stop debugging
+
+b::
+     set breakpoint on current line
+B::
+     set breakpoint at specified function or exception
+u::
+     delete breakpoint on current line
+
+e::
+     eval a PHP expression, prints to *Messages* buffer
+
+d::
+     print stack trace, move up and down
+w::
+     go to current line
+v::
+     view locals and superglobals
+
+?::
+     geben mode help
+
+See also "Help" option in CONFIGURATION section below.
+
 
 Other debug clients
 ~~~~~~~~~~~~~~~~~~~
-If ClientPort is set, phpsh will expect an external xdebug client to listen 
+If ClientPort is set, phpsh will expect an external xdebug client to listen
 on that port and will try to connect to the client. If connection is successful,
 phpsh will not attempt to start emacs, but will be using the client as the
 debugging frontend. This can be used, for example, to run debugging from phpsh
@@ -184,7 +224,7 @@ Config file support was added in phpsh-1.2. When phpsh starts up it
 tries to read its configuration from /etc/phpsh/config, then from
 $HOME/.phpsh/config. If either file is not present or not readable, it
 is ignored. Entries in the per-user config file $HOME/.phpsh/config
-override the corresponding entries in the host-wide config file 
+override the corresponding entries in the host-wide config file
 /etc/phpsh/config.
 
 The config file consists of sections containing key:value pairs.
@@ -198,9 +238,9 @@ supported:
 ~~~~~~~~~~~
 Xdebug::
     Location of xdebug.so, a debugging extension for the Zend
-    engine. If set to "yes" (without quoutes) phpsh will look 
-    for xdebug.so in the extensions directory reported by 
-    php-config. Set to "no" to disable loading xdebug into php VM. 
+    engine. If set to "yes" (without quoutes) phpsh will look
+    for xdebug.so in the extensions directory reported by
+    php-config. Set to "no" to disable loading xdebug into php VM.
     This will disable all debugging support. Default is "yes".
 
 DebugClient::
@@ -208,8 +248,8 @@ DebugClient::
   emacs under X and loads Geben, an xdebug frontend written in Emacs lisp.
 
 ClientTimeout::
-  Number of seconds to wait for debug client to start up and begin listening 
-  for xdebug connections. Default is 60. If set to "none", 0 or a negative 
+  Number of seconds to wait for debug client to start up and begin listening
+  for xdebug connections. Default is 60. If set to "none", 0 or a negative
   number phpsh will wait until killed.
 
 ClientHost::
@@ -222,8 +262,8 @@ ClientPort::
 
 ProxyPort::
   The port on which the proxy should listen for xdebug connections. By default
-  the proxy will use the lowest available even-numbered port between 
-  9002 and 9998. If DebugClient is also unset or set to "emacs", the proxy 
+  the proxy will use the lowest available even-numbered port between
+  9002 and 9998. If DebugClient is also unset or set to "emacs", the proxy
   will configure emacs PHP debug client to listen on the next port up.
 
 X11::
@@ -237,12 +277,12 @@ X11::
 
 Help::
   This option works only if DebugClient is unset or set to "emacs". If
-  set to "yes", when emacs starts it will show a help screen for its PHP 
+  set to "yes", when emacs starts it will show a help screen for its PHP
   debugging mode. If set to "no", a help file will be loaded into an Emacs
   buffer but will not be displayed on startup. Default is "no".
 
 LogDBGp::
-  If "yes", debug proxy will log DBGp (xdebug protocol) messages to 
+  If "yes", debug proxy will log DBGp (xdebug protocol) messages to
   file dbgp.log in the current directory. Defaul is "no".
 
 [Emacs]
@@ -255,7 +295,7 @@ ForegroundColor::
   Foreground color of default typeface. Default is black.
 
 BackgroundColor::
-  Background color of default typeface when a debugging session is in 
+  Background color of default typeface when a debugging session is in
   progress. Default is white.
 
 InactiveColor::
@@ -263,7 +303,7 @@ InactiveColor::
   debugging in progress). Default is grey75.
 
 InactiveMinimize::
-  If set to "yes", minimize (iconify) Emacs window upon completion of 
+  If set to "yes", minimize (iconify) Emacs window upon completion of
   debugging session. Restore (deiconify) window when next session begins.
   Default is "yes". On some X servers Emacs fails to deiconify correctly.
   If that's the case for you, set this to "no".

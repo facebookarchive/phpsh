@@ -75,6 +75,17 @@ will print the three dots all at once after three seconds.
 </p>
 </dd>
 <dt><b>
+-v
+</b></dt>
+<dt><b>
+--verbose
+</b></dt>
+<dd>
+<p>
+        Be more verbose, do not defer warnings about missing extensions.
+</p>
+</dd>
+<dt><b>
 -A
 </b></dt>
 <dt><b>
@@ -207,8 +218,7 @@ x [=]function([args])
 <dd>
 <p>
        Execute function() with args under debugger (xdebug).
-      Currently geben for emacs is the only debug client supported. This
-      command requires X11.
+       Currently geben for emacs is the only debug client supported.
 </p>
 </dd>
 <dt><b>
@@ -270,10 +280,122 @@ supported. Debugging session terminates as soon as the function
 returns control to phpsh. The default behavior at that point is to
 minimize Emacs without closing it, this can be customized through
 configuration settings in [Emacs] section of the phpsh config
-file. All breakpoints set during debugging session are saved by geben
-and will be set automatically when the next debugging session
-starts. If Emacs is terminated by user, all breakpoints set so far are
-lost. When phpsh exits it kills its Emacs process if one is running.</p>
+file. If debugging is done in a separate X window, all breakpoints
+set during debugging session are saved by geben and will be set
+automatically when the next debugging session starts. If Emacs is
+terminated by user, all breakpoints are lost. Breakpoints are also cleared
+at the end of each debugging session if debugging is run in the terminal
+because X is unavailable or terminal debugging is requested via the "X11"
+configuration option (see CONFIGURATION). When phpsh exits it kills its Emacs
+process if one is running.</p>
+<h3><a name="_geben_debugger_commands"></a>Geben debugger commands</h3>
+<dl>
+<dt><b>
+g
+</b></dt>
+<dd>
+<p>
+     run
+</p>
+</dd>
+<dt><b>
+i
+</b></dt>
+<dd>
+<p>
+     step into
+</p>
+</dd>
+<dt><b>
+o
+</b></dt>
+<dd>
+<p>
+     step over
+</p>
+</dd>
+<dt><b>
+r
+</b></dt>
+<dd>
+<p>
+     step out
+</p>
+</dd>
+<dt><b>
+q
+</b></dt>
+<dd>
+<p>
+     stop debugging
+</p>
+</dd>
+<dt><b>
+b
+</b></dt>
+<dd>
+<p>
+     set breakpoint on current line
+</p>
+</dd>
+<dt><b>
+B
+</b></dt>
+<dd>
+<p>
+     set breakpoint at specified function or exception
+</p>
+</dd>
+<dt><b>
+u
+</b></dt>
+<dd>
+<p>
+     delete breakpoint on current line
+</p>
+</dd>
+<dt><b>
+e
+</b></dt>
+<dd>
+<p>
+     eval a PHP expression, prints to <strong>Messages</strong> buffer
+</p>
+</dd>
+<dt><b>
+d
+</b></dt>
+<dd>
+<p>
+     print stack trace, move up and down
+</p>
+</dd>
+<dt><b>
+w
+</b></dt>
+<dd>
+<p>
+     go to current line
+</p>
+</dd>
+<dt><b>
+v
+</b></dt>
+<dd>
+<p>
+     view locals and superglobals
+</p>
+</dd>
+<dt><b>
+?
+</b></dt>
+<dd>
+<p>
+     geben mode help
+</p>
+</dd>
+</dl>
+<p>See also "Help" option in CONFIGURATION section below.</p>
 <h3><a name="_other_debug_clients"></a>Other debug clients</h3>
 <p>If ClientPort is set, phpsh will expect an external xdebug client to listen
 on that port and will try to connect to the client. If connection is successful,
@@ -301,11 +423,10 @@ Xdebug
 <dd>
 <p>
     Location of xdebug.so, a debugging extension for the Zend
-    engine. By default phpsh will look for xdebug.so in the
-    extensions directory reported by php-config. Set to "no" (without
-    quotes) to disable loading xdebug into php VM. This will disable
-    all debugging support and will stop all warning messages related
-    to debugging.
+    engine. If set to "yes" (without quoutes) phpsh will look
+    for xdebug.so in the extensions directory reported by
+    php-config. Set to "no" to disable loading xdebug into php VM.
+    This will disable all debugging support. Default is "yes".
 </p>
 </dd>
 <dt><b>
@@ -468,7 +589,7 @@ XdebugClientPath
 <p></p>
 <p></p>
 <hr /><p><small>
-Last updated 2008-11-25 21:10:29 PDT
+Last updated 2009-05-07 18:02:31 PDT
 </small></p>
 </body>
 </html>
