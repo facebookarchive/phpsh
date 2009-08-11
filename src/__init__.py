@@ -1,4 +1,5 @@
 from subprocess import Popen, PIPE
+from threading import Thread
 import ansicolor as clr
 import cmd_util as cu
 import ConfigParser
@@ -6,10 +7,10 @@ import os
 import re
 import readline
 import select
+import signal
 import sys
 import tempfile
 import time
-import signal
 
 comm_poll_timeout = 0.01
 
@@ -205,6 +206,28 @@ def until_paren_close_balanced(s):
             return s[:i]
     return s
 
+class LoadCtags(Thread):
+    def __init__(self, phpsh_state):
+        Thread.__init__(self)
+        self.phpsh_state = phpsh_state
+    def run(self):
+        print self.phpsh_state.clr_cmd + \
+            "Loading ctags (in background)" + \
+            self.phpsh_state.clr_default
+        try:
+            import ctags
+            self.phpsh_state.ctags = ctags.Ctags()
+            try:
+                self.phpsh_state.function_signatures = \
+                    ctags.CtagsFunctionSignatures().function_signatures
+            except Exception, e:
+                self.phpsh_state.function_signatures = {}
+                print self.phpsh_state.clr_err + \
+                    "Problem loading function signatures" + \
+                    self.phpsh_state.clr_default
+        except Exception, e:
+            print self.phpsh_state.clr_err + \
+                "Problem loading ctags" + self.phpsh_state.clr_default
 
 class PhpshState:
     """This doesn't perfectly encapsulate state (e.g. the readline module has
@@ -332,20 +355,8 @@ class PhpshState:
         # ctags integration
         self.ctags = None
         if do_ctags and os.path.isfile("tags"):
-            print self.clr_cmd + "Loading ctags" + self.clr_default
-            try:
-                import ctags
-                self.ctags = ctags.Ctags()
-                try:
-                    self.function_signatures = \
-                        ctags.CtagsFunctionSignatures().function_signatures
-                except Exception, e:
-                    self.function_signatures = {}
-                    print self.clr_err + \
-                        "Problem loading function signatures" + \
-                        self.clr_default
-            except Exception, e:
-                print self.clr_err + "Problem loading ctags" + self.clr_default
+            load_ctags = LoadCtags(self)
+            load_ctags.start()
 
         import rlcompleter
         input_rc_file = os.path.join(os.environ["HOME"], ".inputrc")
