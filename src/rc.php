@@ -5,7 +5,7 @@
 // from.  Run ctags from the top of your repo periodically too, to get the
 // benefits of phpsh ctags integration.
 
-// You may make use of the string $___phpshell___codebase_mode which may be
+// You may make use of the string $___phpsh___codebase_mode which may be
 // specified on phpsh startup via -C.  The string is '' by default.
 
 
@@ -17,7 +17,7 @@
 error_reporting(E_ALL);
 
 
-switch ($___phpshell___codebase_mode) {
+switch ($___phpsh___codebase_mode) {
 case '':
   // Put default library includes here.
   //require_once 'relative-path-from-repo-head/lib/codebase_include.php';
@@ -33,6 +33,6 @@ case 'none':
 //  // in a very large codebase.
 
 default:
-  fwrite(STDERR, 'Unknown codebase mode '.$___phpshell___codebase_mode."\n");
+  fwrite(STDERR, 'Unknown codebase mode '.$___phpsh___codebase_mode."\n");
   break;
 }
