@@ -60,6 +60,7 @@ See phpsh -h for invocation options.
     V     Open vim (not read-only) and reload (r) upon return to phpsh.
     e     Open emacs where a function or other identifer is defined.
              ex: php> e some_function
+    E     Open emacs (not read-only) and reload (r) upon return to phpsh.
     x [=]function([args]) Execute function() with args under debugger
     c     Append new includes without restarting; display includes.
     C     Change includes without restarting; display includes.
@@ -255,7 +256,7 @@ class PhpshState:
         self.do_echo = do_echo
         self.p_dbgp = None; # debugging proxy
         self.dbgp_port = 9000; # default port on which dbgp proxy listens
-        self.temp_file_name = tempfile.mktemp()
+        self.temp_file_name = tempfile.mkstemp()[1]
         self.output_tempfile = None # tempfile to buffer php output
         self.with_xdebug = with_xdebug;
         self.verbose = verbose
@@ -524,17 +525,32 @@ class PhpshState:
             try:
                 self.php_open()
             except ProblemStartingPhp, e:
+                self.end_process()
+
                 print self.clr_cmd + """phpsh failed to initialize PHP.
 Fix the problem and hit enter to reload or ctrl-C to quit."""
+
                 if e.line_num:
-                    print "Type V to vim to %s: %s" % (e.file_name, e.line_num)
+                    print ("Type 'e' to open emacs or 'V' to open vim to %s: %s"
+                           % (e.file_name, e.line_num))
                     print self.clr_default
-                    if raw_input() == "V":
-                        Popen("vim +" + str(e.line_num) + " " + e.file_name,
-                            shell=True).wait()
+
+                    response = raw_input()
+                    if response == "V":
+                        editor = "vim"
+                    elif response == "e":
+                        editor = "emacs -nw"
+                    else:
+                        editor = ""
+
+                    if editor != "":
+                        Popen(editor + " +" + str(e.line_num) + " " +
+                              e.file_name, shell=True).wait()
+
                 else:
                     print self.clr_default
                     raw_input()
+
         # this file is how phpsh.php tells us it is done with a command
         self.comm_file = open(self.temp_file_name)
         self.wait_on_ready()
@@ -545,14 +561,7 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
            self.to_dbgp.write("run php\n")
 
         self.initialized_successfully = False
-        try:
-            self.p.stdout.close()
-            self.p.stderr.close()
-            self.p.stdin.close()
-            os.waitpid(self.p.pid, 0)
-        except (IOError, KeyboardInterrupt):
-           os.kill(self.p.pid, signal.SIGKILL)
-           os.waitpid(self.p.pid, 0) # collect the zombie
+        self.end_process()
 
         return self.php_open_and_check()
 
@@ -563,21 +572,24 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
            os.putenv("XDEBUG_CONFIG", "remote_port="+str(self.dbgp_port)+
                      " remote_enable=1");
         self.p = Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE,
-            preexec_fn=os.setsid)
+                       preexec_fn=os.setsid)
         if self.with_xdebug:
            # disable remote debugging for other instances of php started by
            # this script, such as the multiline syntax verifyer
            os.putenv("XDEBUG_CONFIG", "remote_enable=0");
 
+        print self.clr_cmd + "> " + cmd + " ..." + self.clr_default,
         p_line = self.p.stdout.readline().rstrip()
+        print ""
+
         if p_line != "#start_autocomplete_identifiers":
             err_lines = self.p.stderr.readlines();
 
             err_str = "UNKNOWN ERROR (maybe php build does not support signals/tokenizer?)"
+            parse_error_re = re.compile("PHP Parse error: .* in (.*) on line ([0-9]*)")
             for line in reversed(err_lines):
                 err_line = line.rstrip()
-                m = re.match("PHP Parse error: .* in (.*) on line ([0-9]*)",
-                             err_line)
+                m = parse_error_re.match(err_line)
                 if m:
                    err_str = err_line
                    break
@@ -592,6 +604,7 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
                 raise ProblemStartingPhp(file_name, line_num)
             else:
                 raise ProblemStartingPhp()
+
         while True:
             p_line = self.p.stdout.readline().rstrip()
             if p_line == "#end_autocomplete_identifiers":
@@ -895,14 +908,20 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
         self.write()
         print self.clr_default
         os.remove(self.temp_file_name)
+        self.end_process(True)
+
+    def end_process(self, alarm=False):
         # shutdown php, if it doesn't exit in 5s, kill -9
-        signal.signal(signal.SIGALRM, sigalrm_handler)
+        if alarm:
+           signal.signal(signal.SIGALRM, sigalrm_handler)
         try:
             self.p.stdout.close()
             self.p.stderr.close()
             self.p.stdin.close()
-            signal.alarm(5)
+            if alarm:
+               signal.alarm(5)
             os.waitpid(self.p.pid, 0)
         except (IOError, OSError, KeyboardInterrupt):
            os.kill(self.p.pid, signal.SIGKILL)
            os.waitpid(self.p.pid, 0) # collect the zombie
+        self.p = None
