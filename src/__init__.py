@@ -572,12 +572,21 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
         p_line = self.p.stdout.readline().rstrip()
         if p_line != "#start_autocomplete_identifiers":
             err_lines = self.p.stderr.readlines();
-            if len(err_lines) >= 1:
-                err_str = err_lines[-1].rstrip()
-            else:
-                err_str = "UNKNOWN ERROR (maybe php build does not support signals/tokenizer?)"
-            print self.clr_err + err_str + self.clr_default
-            m = re.match("PHP Parse error: .* in (.*) on line ([0-9]*)", err_str)
+
+            err_str = "UNKNOWN ERROR (maybe php build does not support signals/tokenizer?)"
+            for line in reversed(err_lines):
+                err_line = line.rstrip()
+                m = re.match("PHP Parse error: .* in (.*) on line ([0-9]*)",
+                             err_line)
+                if m:
+                   err_str = err_line
+                   break
+
+            print self.clr_err
+            for err_line in err_lines:
+               print err_line,
+            print self.clr_default
+
             if m:
                 file_name, line_num = m.groups()
                 raise ProblemStartingPhp(file_name, line_num)
