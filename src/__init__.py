@@ -60,7 +60,6 @@ See phpsh -h for invocation options.
     V     Open vim (not read-only) and reload (r) upon return to phpsh.
     e     Open emacs where a function or other identifer is defined.
              ex: php> e some_function
-    E     Open emacs (not read-only) and reload (r) upon return to phpsh.
     x [=]function([args]) Execute function() with args under debugger
     c     Append new includes without restarting; display includes.
     C     Change includes without restarting; display includes.
