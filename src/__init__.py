@@ -577,9 +577,7 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
            # this script, such as the multiline syntax verifyer
            os.putenv("XDEBUG_CONFIG", "remote_enable=0");
 
-        print self.clr_cmd + "> " + cmd + " ..." + self.clr_default,
         p_line = self.p.stdout.readline().rstrip()
-        print ""
 
         if p_line != "#start_autocomplete_identifiers":
             err_lines = self.p.stderr.readlines();
