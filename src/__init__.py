@@ -357,6 +357,8 @@ class PhpshState:
         if do_ctags and os.path.isfile("tags"):
             load_ctags = LoadCtags(self)
             load_ctags.start()
+        else:
+            self.function_signatures = {}
 
         import rlcompleter
         input_rc_file = os.path.join(os.environ["HOME"], ".inputrc")
