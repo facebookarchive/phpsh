@@ -14,6 +14,82 @@ import time
 
 comm_poll_timeout = 0.01
 
+PHP_RESERVED_WORDS = [
+    # Include reserved words from 
+    # http://us3.php.net/manual/en/reserved.keywords.php
+    "abstract",
+    "and",
+    "array",
+    "as",
+    "break",
+    "case",
+    "catch",
+    "cfunction",
+    "class",
+    "clone",
+    "const",
+    "else",
+    "continue",
+    "declare",
+    "default",
+    "do",
+    "else",
+    "elseif",
+    "enddeclare",
+    "endfor",
+    "endforeach",
+    "endif",
+    "endswitch",
+    "endwhile",
+    "extends",
+    "final",
+    "for",
+    "foreach",
+    "function",
+    "global",
+    "goto", # (!)
+    "if",
+    "implements",
+    "interface",
+    "instanceof",
+    "namespace",
+    "new",
+    "old_function",
+    "or",
+    "private",
+    "protected",
+    "public",
+    "static",
+    "switch",
+    "throw",
+    "try",
+    "use",
+    "var",
+    "while",
+    "xor",
+    "__CLASS__",
+    "__DIR__",
+    "__FILE__",
+    "__FUNCTION__",
+    "__METHOD__",
+    "__NAMESPACE__",
+    "die",
+    "echo",
+    "empty",
+    "exit",
+    "eval",
+    "include",
+    "include_once",
+    "isset",
+    "list",
+    "require",
+    "require_once",
+    "return",
+    "print",
+    "unset",
+    ]
+
+
 def help_message():
    return """\
 -- Help --
@@ -382,7 +458,8 @@ class PhpshState:
             # couldn't read history (probably one hasn't been created yet)
             pass
 
-        self.autocomplete_identifiers = []
+        self.autocomplete_identifiers = list(PHP_RESERVED_WORDS)
+
         self.autocomplete_cache = None
         self.autocomplete_match = None
         self.autocomplete_signature = None
@@ -567,7 +644,7 @@ Fix the problem and hit enter to reload or ctrl-C to quit."""
         return self.php_open_and_check()
 
     def php_open(self):
-        self.autocomplete_identifiers = []
+        self.autocomplete_identifiers = list(PHP_RESERVED_WORDS)
         cmd = " ".join([self.comm_base] + list(self.cmd_incs))
         if self.with_xdebug:
            os.putenv("XDEBUG_CONFIG", "remote_port="+str(self.dbgp_port)+
