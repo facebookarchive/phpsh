@@ -27,7 +27,7 @@ setup(
                             'xdebug-clients/geben/geben.elc',
                             'xdebug-clients/geben/help',
                             'xdebug-clients/geben/tree-widget/geben/*.png']},
-    scripts=['src/phpsh'],
+    scripts=['src/phpsh', 'src/phpsh_check_syntax'],
     data_files=[
         ('/etc/phpsh', ['src/rc.php', 'src/php_manual.db', 'src/config.sample']),
         ('/usr/local/man/man1', ['src/doc/phpsh.1']),

@@ -15,7 +15,7 @@ import time
 comm_poll_timeout = 0.01
 
 PHP_RESERVED_WORDS = [
-    # Include reserved words from
+    # Include reserved words from 
     # http://us3.php.net/manual/en/reserved.keywords.php
     "abstract",
     "and",
@@ -187,16 +187,14 @@ class PhpMultiliner:
         self.partial = ""
 
     def check_syntax(self, line):
-        p = Popen(["php", "-r", line], stdout=PIPE, stderr=PIPE)
+        p = Popen(["phpsh_check_syntax", line], stderr=PIPE)
         p.wait()
-        # "php -r" lint errors seem to only use stdout, but it might (idk)
-        # depend on configuration or change later, so just grab everything.
-        l = ''.join(p.stdout.readlines()) + ''.join(p.stderr.readlines())
-        if l:
+        l = p.stderr.readline()
+        if l.find('syntax error') != -1:
             if l.find('unexpected $end') != -1:
-                return (self.incomplete, "")
+                return (self.incomplete, l)
             return (self.syntax_error, l)
-        return (self.complete, "")
+        return (self.complete, l)
 
     def input_line(self, line):
         if self.partial:
@@ -206,15 +204,25 @@ class PhpMultiliner:
         if not partial_mod:
             return (self.complete, "")
 
-        (syntax_info, _) = self.check_syntax(partial_mod)
+        # There is a terrible bug in php/eval where and unclosed ' only creates
+        # a warning!  (" and ` correctly give syntax errors.)
+        # So we have to explicitly and hackily check for this error..
+        #
+        # If this does _not_ error, then you have an unclosed '
+        may_be_right = True
+        (syntax_info, result_str) = self.check_syntax(partial_mod + ";())';")
         if syntax_info == self.complete:
-            # Multiline inputs are encoded to one line.
-            partial_mod = line_encode(partial_mod)
-            self.clear()
-            return (syntax_info, partial_mod)
+            may_be_right = False
 
-        # We need to pull off the syntactic sugar ; to see if the line failed
-        # the syntax check because of syntax_error, or because of incomplete.
+        if may_be_right:
+            (syntax_info, result_str) = self.check_syntax(partial_mod)
+            if syntax_info == self.complete:
+                # multiline inputs are encoded to one line
+                partial_mod = line_encode(partial_mod)
+                self.clear()
+                return (syntax_info, partial_mod)
+        # need to pull off syntactic sugar ; to see if line failed the syntax
+        # check because of syntax_error, or because of incomplete
         return self.check_syntax(partial_mod[:-1])
 
     def clear(self):
