@@ -1,5 +1,0 @@
-#!/usr/bin/env php
-<?php
-ini_set('display_errors', 'stderr');
-error_reporting(E_PARSE);
-eval('return;'.$argv[1]);
