@@ -2,11 +2,12 @@
 
 // Have this file include/do anything to set up your php codebase environment.
 // Expect it to run from the top of your repo, where you should start phpsh
-// from.  Run ctags from the top of your repo periodically too, to get the
-// benefits of phpsh ctags integration.
+// from (or add top-of-repo-finding logic here, etc).  Run ctags from the top
+// of your repo periodically too, to get the benefits of phpsh ctags
+// integration.
 
 // You may make use of the string $___phpsh___codebase_mode which may be
-// specified on phpsh startup via -C.  The string is '' by default.
+// specified on phpsh startup via -c.  The string is '' by default.
 
 
 // E_ALL catches certain coding errors and we recommend it.  Comment this out
@@ -36,3 +37,4 @@ default:
   fwrite(STDERR, 'Unknown codebase mode '.$___phpsh___codebase_mode."\n");
   break;
 }
+
