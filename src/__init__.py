@@ -192,7 +192,6 @@ class PhpMultiliner:
         # "php -r" lint errors seem to only use stdout, but it might (idk)
         # depend on configuration or change later, so just grab everything.
         l = ''.join(p.stdout.readlines()) + ''.join(p.stderr.readlines())
-        print (line, l)
         if l:
             if l.find('unexpected $end') != -1:
                 return (self.incomplete, "")
