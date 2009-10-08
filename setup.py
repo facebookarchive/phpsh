@@ -15,7 +15,7 @@ setup(
     version='1.2',
     description='interactive shell into a php codebase',
     author='facebook',
-    author_email='phpsh@facebook.com',
+    author_email='phpsh@googlegroups.com',
     url='http://www.phpsh.org/',
     packages=['phpsh'],
     package_dir={'phpsh': 'src'},

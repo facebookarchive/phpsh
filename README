@@ -1,3 +1,5 @@
+Mailing list at: http://groups.google.com/group/phpsh
+
 To install:
 (Note that the install currently clobbers any previous /etc/phpsh/rc.php)
 ~ python setup.py build
@@ -21,8 +23,6 @@ To set up after install:
   ~ phpsh -c none
 - For individual configuration, also see rc.example.php in the php
   distribution.
-
-Contact phpsh@facebook.com with any questions.
 
 
 Note to ppl hacking on phpsh:
