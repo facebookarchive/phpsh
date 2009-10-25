@@ -191,7 +191,11 @@ class PhpMultiliner:
         p.wait()
         # "php -r" lint errors seem to only use stdout, but it might (idk)
         # depend on configuration or change later, so just grab everything.
-        l = ''.join(p.stdout.readlines()) + ''.join(p.stderr.readlines())
+        ls = p.stdout.readlines() + p.stderr.readlines()
+        # hack so that missing extensions etc don't halt all phpsh use.
+        # these php startup errors will still show at phpsh start up.
+        ls = [l for l in ls if l.find('PHP Startup:') == -1]
+        l = ''.join(ls)
         if l:
             if l.find('unexpected $end') != -1:
                 return (self.incomplete, "")
