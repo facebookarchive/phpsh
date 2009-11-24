@@ -7,8 +7,11 @@ To install:
 (Will download and install the pysqlite dependency for you if needed.)
 
 The buildscript uses setuptools.  This comes with python >= 2.5.
-If you are using older python, go grab EasyInstall:
+If you are using python 2.4, go grab EasyInstall:
 http://peak.telecommunity.com/DevCenter/EasyInstall#installing-easy-install
+Currently, python 2.3 and earlier is not supported.  Let us know if
+your setup requires that and we might try to support a lower common
+denomenator..
 
 To set up after install:
 - If you just want to use vanilla php, just do ~ phpsh  and have fun.
