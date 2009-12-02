@@ -450,6 +450,7 @@ class ___Phpsh___ {
   function undefined_function_check($buffer) {
     $toks = token_get_all('<?php '.$buffer);
     $cur_func = null;
+    $ignore_next_func = false;
     foreach ($toks as $tok) {
       if (is_string($tok)) {
         if ($tok === '(') {
@@ -463,13 +464,19 @@ class ___Phpsh___ {
       } elseif (is_array($tok)) {
         list($tok_type, $tok_val, $tok_line) = $tok;
         if ($tok_type === T_STRING) {
-          $cur_func = $tok_val;
+          if ($ignore_next_func) {
+            $cur_func = null;
+            $ignore_next_func = false;
+          } else {
+            $cur_func = $tok_val;
+          }
+        } else if ($tok_type === T_FUNCTION) {
+          $ignore_next_func = true;
         } else if (
-            $tok_type === T_WHITESPACE ||
-            $tok_type === T_COMMENT) {
-          // preserve current func
-        } else {
+            $tok_type !== T_WHITESPACE &&
+            $tok_type !== T_COMMENT) {
           $cur_func = null;
+          $ignore_next_func = false;
         }
       }
     }
