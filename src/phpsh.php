@@ -470,7 +470,11 @@ class ___Phpsh___ {
           } else {
             $cur_func = $tok_val;
           }
-        } else if ($tok_type === T_FUNCTION) {
+        } else if (
+            $tok_type === T_FUNCTION ||
+            $tok_type === T_NEW ||
+            $tok_type === T_OBJECT_OPERATOR ||
+            $tok_type === T_DOUBLE_COLON) {
           $ignore_next_func = true;
         } else if (
             $tok_type !== T_WHITESPACE &&
