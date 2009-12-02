@@ -390,7 +390,7 @@ class PhpshState:
                             self.xdebug_disabled_reason = "\
 Xdebug version %s is too low.  xdebug-2.0.3 or above required." % \
 xdebug_version
-                        self.with_xdebug = False
+                            self.with_xdebug = False
                     except Exception, msg:
                         self.xdebug_disabled_reason = self.xdebug_path + \
                             " is incompatible with your php build"
