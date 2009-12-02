@@ -36,6 +36,7 @@ if (file_exists($___phpsh___homerc)) {
 
 $___phpsh___do_color = true;
 $___phpsh___do_autocomplete = true;
+$___phpsh___do_undefined_function_check = true;
 $___phpsh___options_possible = true;
 foreach (array_slice($GLOBALS['argv'], 3) as $___phpsh___arg) {
   $___phpsh___did_arg = false;
@@ -47,6 +48,10 @@ foreach (array_slice($GLOBALS['argv'], 3) as $___phpsh___arg) {
       break;
     case '-A':
       $___phpsh___do_autocomplete = false;
+      $___phpsh___did_arg = true;
+      break;
+    case '-u':
+      $___phpsh___do_undefined_function_check = false;
       $___phpsh___did_arg = true;
       break;
     case '--':
@@ -61,6 +66,9 @@ foreach (array_slice($GLOBALS['argv'], 3) as $___phpsh___arg) {
 
   include_once $___phpsh___arg;
 }
+unset($___phpsh___arg);
+unset($___phpsh___did_arg);
+unset($___phpsh___options_possible);
 
 $___phpsh___output_from_includes = ob_get_contents();
 ob_end_clean();
@@ -348,7 +356,8 @@ if (!function_exists('___phpsh___pretty_print')) {
 // debugged has been evaluated. Hitting this breakpoint makes debug
 // proxy remove the breakpoint it previously set on the function under
 // debugging.
-function ___phpsh___eval_completed() { }
+function ___phpsh___eval_completed() {
+}
 
 /**
  * An instance of a phpsh interactive loop
@@ -372,16 +381,14 @@ class ___Phpsh___ {
    * @author   dcorson
    */
   function __construct($output_from_includes='', $do_color, $do_autocomplete,
-      $comm_filename) {
+      $do_undefined_function_check, $comm_filename) {
     $this->_comm_handle = fopen($comm_filename, 'w');
-
     $this->__send_autocomplete_identifiers($do_autocomplete);
-
+    $this->do_color = $do_color;
+    $this->do_undefined_function_check = $do_undefined_function_check;
     // now it's safe to send any output the includes generated
     echo $output_from_includes;
     fwrite($this->_comm_handle, "ready\n");
-
-    $this->_interactive_loop($do_color);
   }
 
   /**
@@ -400,7 +407,8 @@ class ___Phpsh___ {
    * @author    ccheever
    */
   function __send_autocomplete_identifiers($do_autocomplete) {
-    // send special string to signal that we're sending the autocomplete identifiers
+    // send special string to signal that we're sending the autocomplete
+    // identifiers
     echo "#start_autocomplete_identifiers\n";
 
     if ($do_autocomplete) {
@@ -434,6 +442,39 @@ class ___Phpsh___ {
     echo "#end_autocomplete_identifiers\n";
   }
 
+  /**
+   * @param   string  $buffer  phpsh input to check function calls in
+   * @return  string  name of first undefined function,
+   *                  or '' if all functions exist
+   */
+  function undefined_function_check($buffer) {
+    $toks = token_get_all('<?php '.$buffer);
+    $cur_func = null;
+    foreach ($toks as $tok) {
+      if (is_string($tok)) {
+        if ($tok === '(') {
+          if ($cur_func !== null) {
+            if (!function_exists($cur_func)) {
+              return $cur_func;
+            }
+          }
+        }
+        $cur_func = null;
+      } elseif (is_array($tok)) {
+        list($tok_type, $tok_val, $tok_line) = $tok;
+        if ($tok_type === T_STRING) {
+          $cur_func = $tok_val;
+        } else if (
+            $tok_type === T_WHITESPACE ||
+            $tok_type === T_COMMENT) {
+          // preserve current func
+        } else {
+          $cur_func = null;
+        }
+      }
+    }
+    return '';
+  }
 
   /**
    * The main interactive loop
@@ -441,10 +482,8 @@ class ___Phpsh___ {
    * @author    ccheever
    * @author    dcorson
    */
-  function _interactive_loop($do_color) {
+  function interactive_loop() {
     extract($GLOBALS);
-
-    $buf_len = 0;
 
     while (!feof($this->_handle)) {
       // indicate to phpsh (parent process) that we are ready for more input
@@ -453,10 +492,31 @@ class ___Phpsh___ {
       // multiline inputs are encoded to one line
       $buffer_enc = fgets($this->_handle, $this->_MAX_LINE_SIZE);
       $buffer = stripcslashes($buffer_enc);
-      $buf_len = strlen($buffer);
 
-      // evaluate what the user's entered
-      if ($do_color) {
+      $err_msg = '';
+      if ($this->do_undefined_function_check) {
+        $undefd_func = $this->undefined_function_check($buffer);
+        if ($undefd_func) {
+          $err_msg =
+            'Not executing input: Possible call to undefined function '.
+            $undefd_func."()\n".
+            'See /etc/phpsh/config.sample to disable UndefinedFunctionCheck.';
+        }
+      }
+      if ($err_msg) {
+        if ($this->do_color) {
+          echo "\033[31m"; // red
+        }
+        echo $err_msg;
+        if ($this->do_color) {
+          echo "\033[0m";
+        }
+        echo "\n";
+        continue;
+      }
+
+      // evaluate what the user entered
+      if ($this->do_color) {
         echo "\033[33m"; // yellow
       }
       try {
@@ -475,15 +535,15 @@ class ___Phpsh___ {
 
       // if any value was returned by the evaluated code, echo it
       if (isset($evalue)) {
-        if ($do_color) {
+        if ($this->do_color) {
           echo "\033[36m"; // cyan
         }
         echo ___phpsh___pretty_print($evalue);
-        // set $_ to be the value of the last evaluated expression
-        $_ = $evalue;
       }
+      // set $_ to be the value of the last evaluated expression
+      $_ = $evalue;
       // back to normal for prompt
-      if ($do_color) {
+      if ($this->do_color) {
         echo "\033[0m";
       }
       // newline so we end cleanly
@@ -492,9 +552,11 @@ class ___Phpsh___ {
   }
 }
 
-// unset all the variables we don't absolutely need
-unset($___phpsh___arg);
-unset($___phpsh___did_arg);
-unset($___phpsh___options_possible);
 $___phpsh___ = new ___Phpsh___($___phpsh___output_from_includes,
-    $___phpsh___do_color, $___phpsh___do_autocomplete, $argv[1]);
+  $___phpsh___do_color, $___phpsh___do_autocomplete,
+  $___phpsh___do_undefined_function_check, $argv[1]);
+unset($___phpsh___do_color);
+unset($___phpsh___do_autocomplete);
+unset($___phpsh___do_undefined_function_check);
+$___phpsh___->interactive_loop();
+

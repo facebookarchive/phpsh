@@ -1,3 +1,12 @@
+[General]
+
+#UndefinedFunctionCheck: yes
+#  If set to "yes", phpsh will use rudimentary static analysis and PHP's
+#  get_defined_functions() to try to prevent you from accidentally calling any
+#  undefined function (which is an uncatchable PHP fatal and therefore restarts
+#  your phpsh session).  If set to "no", this check is disabled.  Default is
+#  "yes".
+
 [Debugging]
 
 #Xdebug: /path/to/xdebug.so
