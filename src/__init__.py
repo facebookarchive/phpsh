@@ -449,7 +449,7 @@ Make sure php-config is in your PATH."""
         if not os.path.exists(home_phpsh_dir):
             os.mkdir(home_phpsh_dir)
         self.history_file = os.path.join(home_phpsh_dir, "history")
-        readline.set_history_length(100)
+        readline.set_history_length(1000)
 
         try:
             readline.read_history_file(self.history_file)
