@@ -32,5 +32,5 @@ setup(
         ('/etc/phpsh', ['src/rc.php', 'src/php_manual.db', 'src/config.sample']),
         ('/usr/local/man/man1', ['src/doc/phpsh.1']),
     ],
-    install_requires=['pysqlite'],
+    install_requires=['pysqlite', 'readline'],
 )
