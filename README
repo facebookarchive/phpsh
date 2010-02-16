@@ -5,6 +5,10 @@ To install:
 ~ python setup.py build
 ~ sudo python setup.py install
 (Will download and install the pysqlite dependency for you if needed.)
+(Note that installs out of an NFS mount with "squash root" enabled
+will not work; you must install from a local directory in that case.
+This is an issue with python egg staging that may be solvable; we
+haven't found a solution yet.)
 
 The buildscript uses setuptools.  This comes with python >= 2.5.
 If you are using python 2.4, go grab EasyInstall:
