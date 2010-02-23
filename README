@@ -4,10 +4,18 @@ Python dependencies:
 - pysqlite
 - readline
 
-To install:
+To install globally:
 (Note that the install currently clobbers any previous /etc/phpsh/rc.php)
 ~ python setup.py build
 ~ sudo python setup.py install
+~ phpsh
+
+To install locally:
+~ python setup.py install --prefix=~
+~ export PYTHONPATH=~/lib/python2.5/site-packages
+~ ~/bin/phpsh
+There are more details on installing from a setup.py at
+http://docs.python.org/library/distutils.html
 
 To set up after install:
 - If you just want to use vanilla php, just do ~ phpsh  and have fun.
