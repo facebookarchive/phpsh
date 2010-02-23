@@ -24,7 +24,7 @@ def _insert_documentation_into_db():
     then inserts stuff into the db.  run from phpsh src/ dir."""
     logging.basicConfig(level=logging.INFO)
 
-    conn = sqlite.connect('php_manual.db')
+    conn = sqlite.connect("php_manual.db")
     lines = _get_documentation()
 
     documentation = ""
@@ -32,8 +32,8 @@ def _insert_documentation_into_db():
     name = None
 
     cursor = conn.cursor()
-    cursor.execute('CREATE TABLE php_manual ' +
-        '(identifier VARCHAR(255) PRIMARY KEY, doc TEXT)')
+    cursor.execute("CREATE TABLE php_manual " +
+        "(identifier VARCHAR(255) PRIMARY KEY, doc TEXT)")
     conn.commit()
 
     for line in lines:
@@ -45,7 +45,7 @@ def _insert_documentation_into_db():
                     logging.warn("truncating documentation for %s" % name)
                 cursor = conn.cursor()
                 sql = \
-                    'REPLACE INTO php_manual (identifier, doc) VALUES (%s, %s)' \
+                    "REPLACE INTO php_manual (identifier, doc) VALUES (%s, %s)" \
                     % (esc(name.lower()), esc(documentation))
                 cursor.execute(sql)
                 conn.commit()
@@ -62,17 +62,17 @@ def _insert_documentation_into_db():
 
 
 def get_documentation_for_identifier(identifier, short=True):
-    identifier = identifier.replace('_', '-').lower()
-    manual_file = 'php_manual.db'
-    manual_path = os.path.join(os.getenv('HOME'), '.phpsh', manual_file)
+    identifier = identifier.replace("_", "-").lower()
+    manual_file = "php_manual.db"
+    manual_path = os.path.join(os.getenv("HOME"), ".phpsh", manual_file)
     if not os.path.exists(manual_path):
-        manual_path = os.path.join('/etc/phpsh', manual_file)
+        manual_path = os.path.join("/etc/phpsh", manual_file)
     conn = sqlite.connect(manual_path)
     cursor = conn.cursor()
 
     sql = "SELECT doc FROM php_manual " + \
         "WHERE identifier = %s OR identifier = %s LIMIT 1" % \
-        (esc('function.' + identifier), esc(identifier))
+        (esc("function." + identifier), esc(identifier))
     cursor.execute(sql)
 
     try:
