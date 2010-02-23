@@ -5,15 +5,20 @@ Python dependencies:
 - readline
 
 To install globally:
-(Note that the install currently clobbers any previous /etc/phpsh/rc.php)
+(Note that this install currently clobbers any previous /etc/phpsh/rc.php)
 ~ python setup.py build
 ~ sudo python setup.py install
 ~ phpsh
 
 To install locally:
+(Note that this install currently clobbers any previous ~/.phpsh/rc.php)
 ~ python setup.py install --prefix=~
-~ export PYTHONPATH=~/lib/python2.5/site-packages
+~ export PYTHONPATH=~/lib/python2.6/site-packages
+(Adjust this if your python minor version differs from 2.6)
 ~ ~/bin/phpsh
+(You will probably want to put the PYTHONPATH line in your .bashrc or such,
+and just add ~/bin to your PATH as well.)
+
 There are more details on installing from a setup.py at
 http://docs.python.org/library/distutils.html
 
