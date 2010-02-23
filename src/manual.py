@@ -1,7 +1,7 @@
 from pysqlite2 import dbapi2 as sqlite
-#from subprocess import 
 import html2text
 import logging
+import os
 import re
 
 __author__ = "ccheever" # Charlie Cheever <charlie@facebook.com>
@@ -20,7 +20,7 @@ def esc(s):
     return '"' + s.replace('\\', '\\\\').replace('"', '""') + '"'
 
 def _insert_documentation_into_db():
-    """goes through the documentation file and pulls out the relevant code and 
+    """goes through the documentation file and pulls out the relevant code and
     then inserts stuff into the db.  run from phpsh src/ dir."""
     logging.basicConfig(level=logging.INFO)
 
@@ -35,7 +35,7 @@ def _insert_documentation_into_db():
     cursor.execute('CREATE TABLE php_manual ' +
         '(identifier VARCHAR(255) PRIMARY KEY, doc TEXT)')
     conn.commit()
-    
+
     for line in lines:
         matches = _identifier_match.search(line)
         if matches:
@@ -63,7 +63,11 @@ def _insert_documentation_into_db():
 
 def get_documentation_for_identifier(identifier, short=True):
     identifier = identifier.replace('_', '-').lower()
-    conn = sqlite.connect('/etc/phpsh/php_manual.db')
+    manual_file = 'php_manual.db'
+    manual_path = os.path.join(os.getenv('HOME'), '.phpsh', manual_file)
+    if not os.path.exists(manual_path):
+        manual_path = os.path.join('/etc/phpsh', manual_file)
+    conn = sqlite.connect(manual_path)
     cursor = conn.cursor()
 
     sql = "SELECT doc FROM php_manual " + \

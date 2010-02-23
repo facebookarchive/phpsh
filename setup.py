@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from setuptools import setup
+from distutils.core import setup
 from subprocess import Popen
 import sys
 import os
@@ -9,6 +9,12 @@ if len(sys.argv) > 1 and sys.argv[1] == 'build':
     make_dir = os.path.join(build_root, "src/xdebug-clients/geben")
     p = Popen(['make', '-C', make_dir])
     os.waitpid(p.pid, 0)
+
+# something better than this?
+if os.getenv('USER') == 'root':
+    config_dir = '/etc/phpsh'
+else:
+    config_dir = os.getenv('HOME') + '/.phpsh'
 
 setup(
     name='phpsh',
@@ -29,8 +35,8 @@ setup(
                             'xdebug-clients/geben/tree-widget/geben/*.png']},
     scripts=['src/phpsh'],
     data_files=[
-        ('/etc/phpsh', ['src/rc.php', 'src/php_manual.db', 'src/config.sample']),
-        ('/usr/local/man/man1', ['src/doc/phpsh.1']),
+        (config_dir, ['src/rc.php', 'src/php_manual.db', 'src/config.sample']),
+        ('man/man1', ['src/doc/phpsh.1']),
     ],
-    install_requires=['pysqlite', 'readline'],
+    requires=['pysqlite', 'readline'],
 )
