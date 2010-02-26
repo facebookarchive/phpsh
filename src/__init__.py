@@ -666,6 +666,7 @@ Type 'e' to open emacs or 'V' to open vim to %s: %s" %
 UNKNOWN ERROR (maybe php build does not support signals/tokenizer?)"
             parse_error_re = re.compile(
                 "PHP Parse error: .* in (.*) on line ([0-9]*)")
+            m = None
             for line in reversed(err_lines):
                 err_line = line.rstrip()
                 m = parse_error_re.match(err_line)
