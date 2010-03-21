@@ -1,4 +1,7 @@
-from pysqlite2 import dbapi2 as sqlite
+try:
+    from pysqlite2 import dbapi2 as sqlite
+except ImportError:
+    from sqlite3 import dbapi2 as sqlite
 import html2text
 import logging
 import os
