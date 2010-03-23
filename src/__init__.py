@@ -1,3 +1,7 @@
+__version__ = "1.3"
+__author__ = "phpsh@googlegroups.com"
+__date__ = "Nov 20, 2008"
+
 from subprocess import Popen, PIPE
 from threading import Thread
 import ansicolor as clr
@@ -308,8 +312,6 @@ class PhpshState:
     full php line) at phpsh.
     """
 
-    phpsh_root = os.path.dirname(os.path.realpath(__file__))
-
     php_prompt = "php> "
     php_more_prompt = " ... "
 
@@ -322,6 +324,8 @@ class PhpshState:
             do_autocomplete, do_ctags, interactive, with_xdebug, verbose):
         """start phpsh.php and do other preparations (colors, ctags)
         """
+
+        self.phpsh_root = os.path.dirname(os.path.realpath(__file__))
 
         self.do_echo = do_echo
         self.p_dbgp = None; # debugging proxy
@@ -533,7 +537,7 @@ Make sure php-config is in your PATH."""
         try:
             to_r, to_w = os.pipe()
             from_r, from_w = os.pipe()
-            dbgp_py = [os.path.join(self.phpsh_root, "dbgp.py"),
+            dbgp_py = ["dbgp-phpsh.py",
                 str(to_r), str(to_w), str(from_r), str(from_w)]
             self.p_dbgp = Popen(dbgp_py)
             os.close(to_r)

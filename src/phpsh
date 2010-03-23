@@ -1,11 +1,7 @@
 #!/usr/bin/env python
 
-__version__ = "1.2"
-__author__ = "phpsh@googlegroups.com"
-__date__ = "Nov 20, 2008"
-
 from optparse import OptionParser
-from phpsh import PhpshState, PhpMultiliner, do_sugar, line_encode
+from phpsh import PhpshState, PhpMultiliner, do_sugar, line_encode, __version__
 import sys
 import os
 
@@ -18,10 +14,11 @@ See /etc/phpsh/rc.php for other codebase modes.""")
 p.add_option("-t", "--test-file",
     help="""Run a saved-phpsh-session unit test file.
 See test/ in the phpsh distribution for examples.""")
-p.add_option("-v", "--verbose", action="store_true",
-    help="""Be more verbose, do not defer warnings about missing extensions.""")
+p.add_option("-v", "--verbose", action="store_true", help=
+    """Be more verbose, do not defer warnings about missing extensions.""")
 
-# are we cool with these negated opts?  at least they indicate the defaults..
+# are we cool with these negated opts?
+# at least they indicate the defaults..
 p.add_option("-A", "--no-autocomplete", action="store_true")
 p.add_option("-C", "--no-color", action="store_true")
 p.add_option("-M", "--no-multiline", action="store_true")
@@ -45,7 +42,8 @@ s = PhpshState(cmd_incs=set(cmd_incs),
 
 if opts.test_file:
     # TODO support multiline in test-mode
-    # TODO? test-mode shouldn't support r/c/i etc should it?  maybs r?  but q?
+    # TODO? test-mode shouldn't support r/c/i etc should it?  maybs r?
+    #   but q?
     # parse test file
     # this is not perfect since output lines could start with "php> " (!!)
     test_f = file(opts.test_file)
@@ -155,4 +153,3 @@ while True:
     else:
         new_expr = False
 s.close()
-

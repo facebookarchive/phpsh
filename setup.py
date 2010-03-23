@@ -4,6 +4,9 @@ from subprocess import Popen
 import sys
 import os
 
+sys.path.insert(0, 'src')
+from phpsh import __version__
+
 if len(sys.argv) > 1 and sys.argv[1] == "build":
     build_root = os.path.dirname(os.path.realpath(__file__))
     make_dir = os.path.join(build_root, "src/xdebug-clients/geben")
@@ -18,7 +21,7 @@ else:
 
 setup(
     name="phpsh",
-    version="1.2",
+    version=__version__,
     description="interactive shell into a php codebase",
     author="facebook",
     author_email="phpsh@googlegroups.com",
@@ -33,7 +36,7 @@ setup(
                             "xdebug-clients/geben/geben.elc",
                             "xdebug-clients/geben/help",
                             "xdebug-clients/geben/tree-widget/geben/*.png"]},
-    scripts=["src/phpsh"],
+    scripts=["src/phpsh", "src/dbgp-phpsh.py"],
     data_files=[
         (config_dir, ["src/rc.php", "src/php_manual.db", "src/config.sample"]),
         ("man/man1", ["src/doc/phpsh.1"]),
