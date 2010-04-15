@@ -864,7 +864,7 @@ tracing_enabled = (config.get_option("Debugging", "LogDBGp") == "yes")
 
 if len(sys.argv) < 5:
     debug_log("dbgp called with %d arguments, 4 required, exiting..." %
-              len(sys.argv)-1)
+              (len(sys.argv)-1))
     sys.exit(1)
 
 try:
