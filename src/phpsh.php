@@ -223,17 +223,16 @@ if (!function_exists('___phpsh___pretty_print')) {
     return $arr_lines;
   }
   function ___phpsh___obj_to_arr($x) {
-    $x_ser = serialize($x);
-    $x_ser = substr($x_ser, strpos($x_ser, ':', 3) + 1);
-    $x_ser = 'a'.substr($x_ser, strpos($x_ser, ':'));
-    $x_arr = array();
-    foreach (unserialize($x_ser) as $k => $v) {
-      if ($k[0] == "\000") {
-        $k = substr($k, strpos($k, "\000", 2) + 1);
+    if (is_object($x)) {
+      $raw_array = (array)$x;
+      $result = array();
+      foreach ($raw_array as $key => $value) {
+        $key = preg_replace('/\\000.*\\000/', '', $key);
+        $result[$key] = $value;
       }
-      $x_arr[$k] = $v;
+      return $result;
     }
-    return $x_arr;
+    return (array)$x;
   }
   function ___phpsh___parse_dump_assert($dump, &$pos, $str, $end=false) {
     $len = strlen($str);
