@@ -529,14 +529,26 @@ class ___Phpsh___ {
       if ($this->do_color) {
         echo "\033[33m"; // yellow
       }
-      try {
-        $evalue = eval($buffer);
-      } catch (Exception $e) {
-        // unfortunately, almost all exceptions that aren't explicitly thrown
-        // by users are uncatchable :(
-        fwrite(STDERR, 'Uncaught exception: '.get_class($e).': '.
-          $e->getMessage()."\n");
-        $evalue = null;
+
+      $parent_pid = posix_getpid();
+      $pid = pcntl_fork();
+      $evalue = null;
+      if ($pid) {
+        pcntl_wait($status);
+      } else {
+        try {
+          $evalue = eval($buffer);
+        } catch (Exception $e) {
+          // unfortunately, almost all exceptions that aren't explicitly thrown
+          // by users are uncatchable :(
+          fwrite(STDERR, 'Uncaught exception: '.get_class($e).': '.
+            $e->getMessage()."\n");
+          $evalue = null;
+        }
+
+        // if we are still alive..
+        $childpid = posix_getpid();
+        fwrite($this->_comm_handle, "child $childpid\n");
       }
 
       if ($buffer != "xdebug_break();\n") {

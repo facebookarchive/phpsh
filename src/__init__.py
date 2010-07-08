@@ -726,9 +726,10 @@ UNKNOWN ERROR (maybe php build does not support signals/tokenizer?)"
                 if ret_code != None:
                     if debug:
                         print "NOOOOO"
+                    print "subprocess died with return code: " + repr(ret_code)
                     died = True
                     break
-                while not died:
+                while True:
                     # line-buffer stdout and stderr
                     if debug:
                         print "start loop"
@@ -747,8 +748,7 @@ UNKNOWN ERROR (maybe php build does not support signals/tokenizer?)"
                             out_buff_i = 1
                         buff = os.read(r.fileno(), buffer_size)
                         if not buff:
-                            # process has died
-                            died = True
+                            # process has died, will be dealt with in outer loop
                             break
                         out_buff[out_buff_i] += buff
                         last_nl_pos = out_buff[out_buff_i].rfind("\n")
@@ -763,9 +763,14 @@ UNKNOWN ERROR (maybe php build does not support signals/tokenizer?)"
                                     err.write(l)
                             out_buff[out_buff_i] = \
                                 out_buff[out_buff_i][last_nl_pos + 1:]
-                # don't sleep if the command is already done
-                # (even tho sleep period is small; maximize responsiveness)
-                if self.comm_file.readline():
+                # at this point either:
+                #  the php instance died
+                #  select timed out
+                l = self.comm_file.readline()
+                if l.startswith("child"):
+                    os.kill(self.p.pid, signal.SIGHUP)
+                    self.p.pid = int(l.split()[1])
+                elif l.startswith("ready"):
                     break
                 time.sleep(comm_poll_timeout)
 
@@ -1001,6 +1006,8 @@ UNKNOWN ERROR (maybe php build does not support signals/tokenizer?)"
         # shutdown php, if it doesn't exit in 5s, kill -9
         if alarm:
             signal.signal(signal.SIGALRM, sigalrm_handler)
+        # if we have fatal-restart prevention, the child proess can't be waited
+        #  on since it's no longer a child of this process
         try:
             self.p.stdout.close()
             self.p.stderr.close()
@@ -1011,6 +1018,9 @@ UNKNOWN ERROR (maybe php build does not support signals/tokenizer?)"
         except (IOError, OSError, KeyboardInterrupt):
             os.kill(self.p.pid, signal.SIGKILL)
             # collect the zombie
-            os.waitpid(self.p.pid, 0)
+            try:
+              os.waitpid(self.p.pid, 0)
+            except (OSError):
+              pass
         self.p = None
 
