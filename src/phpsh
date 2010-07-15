@@ -23,8 +23,10 @@ p.add_option("-A", "--no-autocomplete", action="store_true")
 p.add_option("-C", "--no-color", action="store_true")
 p.add_option("-M", "--no-multiline", action="store_true")
 p.add_option("-T", "--no-ctags", action="store_true")
-p.add_option("-X", "--no-xdebug", action="store_true",
-             help="Disable PHP debugging with xdebug.")
+
+p.add_option("-X", "--xdebug", action="store_true",
+             help="Enable PHP debugging with xdebug (this also disable" +
+                  " forking to save state on fatals)")
 (opts, cmd_incs) = p.parse_args()
 
 # default codebase_mode is "" (don't want None)
@@ -37,7 +39,7 @@ s = PhpshState(cmd_incs=set(cmd_incs),
     do_color=not opts.no_color and not opts.test_file,
     do_echo=not opts.test_file, codebase_mode=opts.codebase_mode,
     do_autocomplete=not opts.no_autocomplete, do_ctags=not opts.no_ctags,
-    interactive=not opts.test_file, with_xdebug=not opts.no_xdebug,
+    interactive=not opts.test_file, with_xdebug=opts.xdebug,
     verbose=opts.verbose)
 
 if opts.test_file:

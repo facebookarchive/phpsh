@@ -38,6 +38,7 @@ $___phpsh___do_color = true;
 $___phpsh___do_autocomplete = true;
 $___phpsh___do_undefined_function_check = true;
 $___phpsh___options_possible = true;
+$___phpsh___fork_every_command = false;
 foreach (array_slice($GLOBALS['argv'], 3) as $___phpsh___arg) {
   $___phpsh___did_arg = false;
   if ($___phpsh___options_possible) {
@@ -52,6 +53,10 @@ foreach (array_slice($GLOBALS['argv'], 3) as $___phpsh___arg) {
       break;
     case '-u':
       $___phpsh___do_undefined_function_check = false;
+      $___phpsh___did_arg = true;
+      break;
+    case '-f':
+      $___phpsh___fork_every_command = true;
       $___phpsh___did_arg = true;
       break;
     case '--':
@@ -380,11 +385,12 @@ class ___Phpsh___ {
    * @author   dcorson
    */
   function __construct($output_from_includes='', $do_color, $do_autocomplete,
-      $do_undefined_function_check, $comm_filename) {
+      $do_undefined_function_check, $fork_every_command, $comm_filename) {
     $this->_comm_handle = fopen($comm_filename, 'w');
     $this->__send_autocomplete_identifiers($do_autocomplete);
     $this->do_color = $do_color;
     $this->do_undefined_function_check = $do_undefined_function_check;
+    $this->fork_every_command = $fork_every_command;
     // now it's safe to send any output the includes generated
     echo $output_from_includes;
     fwrite($this->_comm_handle, "ready\n");
@@ -529,14 +535,38 @@ class ___Phpsh___ {
       if ($this->do_color) {
         echo "\033[33m"; // yellow
       }
-      try {
-        $evalue = eval($buffer);
-      } catch (Exception $e) {
-        // unfortunately, almost all exceptions that aren't explicitly thrown
-        // by users are uncatchable :(
-        fwrite(STDERR, 'Uncaught exception: '.get_class($e).': '.
-          $e->getMessage()."\n");
+
+      if ($this->fork_every_command) {
+        $parent_pid = posix_getpid();
+        $pid = pcntl_fork();
         $evalue = null;
+        if ($pid) {
+          pcntl_wait($status);
+        } else {
+          try {
+            $evalue = eval($buffer);
+          } catch (Exception $e) {
+            // unfortunately, almost all exceptions that aren't explicitly
+            // thrown by users are uncatchable :(
+            fwrite(STDERR, 'Uncaught exception: '.get_class($e).': '.
+              $e->getMessage()."\n");
+            $evalue = null;
+          }
+
+          // if we are still alive..
+          $childpid = posix_getpid();
+          fwrite($this->_comm_handle, "child $childpid\n");
+        }
+      } else {
+        try {
+          $evalue = eval($buffer);
+        } catch (Exception $e) {
+          // unfortunately, almost all exceptions that aren't explicitly thrown
+          // by users are uncatchable :(
+          fwrite(STDERR, 'Uncaught exception: '.get_class($e).': '.
+            $e->getMessage()."\n");
+          $evalue = null;
+        }
       }
 
       if ($buffer != "xdebug_break();\n") {
@@ -564,9 +594,11 @@ class ___Phpsh___ {
 
 $___phpsh___ = new ___Phpsh___($___phpsh___output_from_includes,
   $___phpsh___do_color, $___phpsh___do_autocomplete,
-  $___phpsh___do_undefined_function_check, $argv[1]);
+  $___phpsh___do_undefined_function_check, $___phpsh___fork_every_command,
+  $argv[1]);
 unset($___phpsh___do_color);
 unset($___phpsh___do_autocomplete);
 unset($___phpsh___do_undefined_function_check);
+unset($___phpsh___fork_every_command);
 $___phpsh___->interactive_loop();
 
