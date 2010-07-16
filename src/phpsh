@@ -23,6 +23,7 @@ p.add_option("-A", "--no-autocomplete", action="store_true")
 p.add_option("-C", "--no-color", action="store_true")
 p.add_option("-M", "--no-multiline", action="store_true")
 p.add_option("-T", "--no-ctags", action="store_true")
+p.add_option("-N", "--no-nice", action="store_true")
 
 p.add_option("-X", "--xdebug", action="store_true",
              help="Enable PHP debugging with xdebug (this also disable" +
@@ -32,6 +33,9 @@ p.add_option("-X", "--xdebug", action="store_true",
 # default codebase_mode is "" (don't want None)
 if not opts.codebase_mode:
     opts.codebase_mode = ""
+
+if not opts.no_nice:
+  os.nice(10)
 
 do_multiline = not opts.no_multiline
 
