@@ -501,6 +501,10 @@ class ___Phpsh___ {
   function interactive_loop() {
     extract($GLOBALS);
 
+    // python spawned-processes ignore SIGPIPE by default, this makes sure
+    //  the php process exits when the terminal is closed
+    pcntl_signal(SIGPIPE,SIG_DFL);
+
     while (!feof($this->_handle)) {
       // indicate to phpsh (parent process) that we are ready for more input
       fwrite($this->_comm_handle, "ready\n");
