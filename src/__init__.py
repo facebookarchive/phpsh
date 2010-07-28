@@ -229,9 +229,15 @@ class PhpMultiliner:
         self.partial = ""
 
 class ProblemStartingPhp(Exception):
-    def __init__(self, file_name = None, line_num = None):
+    def __init__(self,
+                 file_name=None,
+                 line_num=None,
+                 stdout_lines=None,
+                 stderr_lines=None):
         self.file_name = file_name
         self.line_num = line_num
+        self.stdout_lines = stdout_lines
+        self.stderr_lines = stderr_lines
 
 class PhpshConfig:
     def __init__(self):
@@ -614,6 +620,13 @@ Could not obtain initialization status from xdebug proxy: %s" % msg)
 phpsh failed to initialize PHP.
 Fix the problem and hit enter to reload or ctrl-C to quit.""")
 
+                if e.stdout_lines:
+                   print("PHP output: %(output)s" %
+                         {'output' : "\n".join(e.stdout_lines)})
+                if e.stderr_lines:
+                   print("PHP error output: %(output)s" %
+                         {'output' : "\n".join(e.stderr_lines)})
+
                 if e.line_num:
                     print("\
 Type 'e' to open emacs or 'V' to open vim to %s: %s" %
@@ -666,7 +679,8 @@ Type 'e' to open emacs or 'V' to open vim to %s: %s" %
         p_line = self.p.stdout.readline().rstrip()
 
         if p_line != "#start_autocomplete_identifiers":
-            err_lines = self.p.stderr.readlines();
+            err_lines = self.p.stderr.readlines()
+            out_lines = self.p.stdout.readlines()
 
             err_str = "\
 UNKNOWN ERROR (maybe php build does not support signals/tokenizer?)"
@@ -687,9 +701,13 @@ UNKNOWN ERROR (maybe php build does not support signals/tokenizer?)"
 
             if m:
                 file_name, line_num = m.groups()
-                raise ProblemStartingPhp(file_name, line_num)
+                raise ProblemStartingPhp(file_name,
+                                         line_num,
+                                         stdout_lines=out_lines,
+                                         stderr_lines=err_lines)
             else:
-                raise ProblemStartingPhp()
+                raise ProblemStartingPhp(stdout_lines=out_lines,
+                                         stderr_lines=err_lines)
 
         while True:
             p_line = self.p.stdout.readline().rstrip()
