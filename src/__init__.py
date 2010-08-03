@@ -6,6 +6,7 @@ from subprocess import Popen, PIPE
 from threading import Thread
 import ansicolor as clr
 import cmd_util as cu
+import ctags
 import ConfigParser
 import os
 import re
@@ -296,19 +297,32 @@ class LoadCtags(Thread):
         self.phpsh_state = phpsh_state
     def run(self):
         try:
-            import ctags
-            self.phpsh_state.ctags = ctags.Ctags()
-            try:
-                self.phpsh_state.function_signatures = \
-                    ctags.CtagsFunctionSignatures().function_signatures
-            except Exception, e:
-                self.phpsh_state.function_signatures = {}
-                print self.phpsh_state.clr_err + \
-                    "Problem loading function signatures" + \
-                    self.phpsh_state.clr_default
+           tags_file_path = None
+           try:
+              tags_file_path = ctags.find_tags_file()
+           except ctags.CantFindTagsFile, e:
+              return
+
+           print self.phpsh_state.clr_cmd + \
+               "Loading ctags (in background)" + \
+               self.phpsh_state.clr_default
+           self.phpsh_state.ctags = ctags.Ctags(tags_file_path)
+           try:
+              self.phpsh_state.function_signatures = \
+                  ctags.CtagsFunctionSignatures().function_signatures
+           except Exception, e:
+              self.phpsh_state.function_signatures = {}
+              print self.phpsh_state.clr_err + \
+                  "Problem loading function signatures" + \
+                  self.phpsh_state.clr_default
         except Exception, e:
-            print self.phpsh_state.clr_err + \
-                "Problem loading ctags" + self.phpsh_state.clr_default
+           if tags_file_path:
+              path = tags_file_path
+           else:
+              path = ""
+           print self.phpsh_state.clr_err + \
+               "Problem loading ctags %(path)s\n(%(e)s)\n" % locals() + \
+               self.phpsh_state.clr_default
 
 class PhpshState:
     """This doesn't perfectly encapsulate state (e.g. the readline module has
@@ -438,12 +452,8 @@ Make sure php-config is in your PATH."""
 
         # ctags integration
         self.ctags = None
-        if do_ctags and os.path.isfile("tags"):
-            print self.clr_cmd + \
-                "Loading ctags (in background)" + \
-                self.clr_default
-            load_ctags = LoadCtags(self)
-            load_ctags.start()
+        if do_ctags:
+           LoadCtags(self).start()
         else:
             self.function_signatures = {}
 
