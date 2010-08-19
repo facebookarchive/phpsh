@@ -493,6 +493,24 @@ class ___Phpsh___ {
   }
 
   /**
+   * eval with exception handling
+   */
+  function eval_and_handle($buffer) {
+    try {
+      $evalue = eval($buffer);
+    } catch (Exception $e) {
+      // unfortunately, almost all exceptions that aren't explicitly
+      // thrown by users are uncatchable :(
+      fwrite(STDERR,
+             'Uncaught exception: '.get_class($e).': '.
+             $e->getMessage()."\n".
+             $e->getTraceAsString()."\n");
+      $evalue = null;
+    }
+    return $evalue;
+  }
+
+  /**
    * The main interactive loop
    *
    * @author    ccheever
@@ -547,30 +565,13 @@ class ___Phpsh___ {
         if ($pid) {
           pcntl_wait($status);
         } else {
-          try {
-            $evalue = eval($buffer);
-          } catch (Exception $e) {
-            // unfortunately, almost all exceptions that aren't explicitly
-            // thrown by users are uncatchable :(
-            fwrite(STDERR, 'Uncaught exception: '.get_class($e).': '.
-              $e->getMessage()."\n");
-            $evalue = null;
-          }
-
+          $evalue = $this->eval_and_handle($buffer);
           // if we are still alive..
           $childpid = posix_getpid();
           fwrite($this->_comm_handle, "child $childpid\n");
         }
       } else {
-        try {
-          $evalue = eval($buffer);
-        } catch (Exception $e) {
-          // unfortunately, almost all exceptions that aren't explicitly thrown
-          // by users are uncatchable :(
-          fwrite(STDERR, 'Uncaught exception: '.get_class($e).': '.
-            $e->getMessage()."\n");
-          $evalue = null;
-        }
+        $evalue = $this->eval_and_handle($buffer);
       }
 
       if ($buffer != "xdebug_break();\n") {
