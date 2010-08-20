@@ -208,6 +208,10 @@ if (!function_exists('___phpsh___pretty_print')) {
     for ($i = 0; $i < $arr_len; $i++) {
       ___phpsh___parse_dump_assert($dump, $pos, $depth_str.$indent_str.'[');
       $key = ___phpsh___parse_dump_delim_grab($dump, $pos, false, '""');
+      if ($dump[$pos] == ':') {
+        $key .= ':' . ___phpsh___parse_dump_delim_grab($dump, $pos, false, ':]');
+        $pos--;
+      }
       ___phpsh___parse_dump_assert($dump, $pos, "]=>\n".$depth_str.$indent_str);
       if ($dump[$pos] == '*') {
         ___phpsh___parse_dump_assert($dump, $pos, '*RECURSION*');
