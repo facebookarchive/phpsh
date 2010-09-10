@@ -4,6 +4,7 @@ __date__ = "Nov 20, 2008"
 
 from subprocess import Popen, PIPE
 from threading import Thread
+from bisect import bisect
 import ansicolor as clr
 import cmd_util as cu
 import ctags
@@ -500,9 +501,11 @@ Make sure php-config is in your PATH."""
                 return None
             if state == 0:
                 self.autocomplete_cache = []
-                for identifier in self.autocomplete_identifiers:
-                    if identifier.startswith(text):
-                        self.autocomplete_cache.append(identifier)
+                pos = bisect(self.autocomplete_identifiers, text)
+
+                while self.autocomplete_identifiers[pos].startswith(text):
+                    self.autocomplete_cache.append(self.autocomplete_identifiers[pos])
+                    pos = pos + 1
 
                 if self.function_signatures.has_key(text):
                     for sig in self.function_signatures[text]:
@@ -723,7 +726,7 @@ UNKNOWN ERROR (maybe php build does not support signals/tokenizer?)"
             p_line = self.p.stdout.readline().rstrip()
             if p_line == "#end_autocomplete_identifiers":
                 break
-            self.autocomplete_identifiers.append(p_line)
+            self.autocomplete_identifiers.insert(bisect(self.autocomplete_identifiers, p_line), p_line)
 
     def wait_for_comm_finish(self, defer_output=False):
         try:
