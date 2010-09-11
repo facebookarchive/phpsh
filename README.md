@@ -1,5 +1,18 @@
 Mailing list at: [http://groups.google.com/group/phpsh]([http://groups.google.com/group/phpsh])
 
+PHP Dependencies
+===================
+__Version:__
+
+ * PHP 5+
+
+__Modules:__
+
+ * [pcntl](http://php.net/manual/en/book.pcntl.php)
+ * [pcre](http://php.net/manual/en/book.pcre.php)
+ * [posix](http://php.net/manual/en/book.posix.php)
+ * [tokenizer](http://php.net/manual/en/book.tokenizer.php)
+
 Python Dependencies
 ===================
 * sqlite  
