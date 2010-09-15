@@ -1,0 +1,12 @@
+Loading ctags
+Starting php
+type 'h' or 'help' to see instructions & features
+php> = 3 + 3
+6
+php> = $_
+6
+php> $x = $_
+
+php> print $x
+6
+php> 
