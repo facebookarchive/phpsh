@@ -480,7 +480,7 @@ Make sure php-config is in your PATH."""
             # couldn't read history (probably one hasn't been created yet)
             pass
 
-        self.autocomplete_identifiers = list(PHP_RESERVED_WORDS)
+        self.autocomplete_identifiers = sorted(PHP_RESERVED_WORDS)
 
         self.autocomplete_cache = None
         self.autocomplete_match = None
@@ -504,8 +504,8 @@ Make sure php-config is in your PATH."""
                 pos = bisect(self.autocomplete_identifiers, text)
 
                 while self.autocomplete_identifiers[pos].startswith(text):
-                    identifiers = self.autocomplete_identifiers[pos]
-                    self.autocomplete_cache.append(identifiers)
+                    identifier = self.autocomplete_identifiers[pos]
+                    self.autocomplete_cache.append(identifier)
                     pos = pos + 1
 
                 if self.function_signatures.has_key(text):
@@ -674,7 +674,7 @@ Type 'e' to open emacs or 'V' to open vim to %s: %s" %
         return self.php_open_and_check()
 
     def php_open(self):
-        self.autocomplete_identifiers = list(PHP_RESERVED_WORDS)
+        self.autocomplete_identifiers = sorted(PHP_RESERVED_WORDS)
         cmd = " ".join([self.comm_base] + list(self.cmd_incs))
         if self.with_xdebug:
             os.putenv("XDEBUG_CONFIG", "remote_port=" + str(self.dbgp_port) +
