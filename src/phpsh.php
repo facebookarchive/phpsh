@@ -25,8 +25,11 @@ if (version_compare(PHP_VERSION, '5.0.0', '<')) {
   exit;
 }
 
-if ($missing = array_diff(array('pcntl','pcre','posix','tokenizer'), get_loaded_extensions())) {
-  fwrite(STDERR, 'Fatal error: phpsh requires the following extensions: ' . implode(', ', $missing));
+$missing = array_diff(array('pcntl','pcre','posix','tokenizer'),
+                      get_loaded_extensions());
+if ($missing) {
+  fwrite(STDERR, 'Fatal error: phpsh requires the following extensions: '.
+         implode(', ', $missing));
   exit;
 }
 
@@ -112,7 +115,7 @@ if (!function_exists('___phpsh___pretty_print')) {
       $_depth=0) {
     static $indent_str = '  ';
     $depth_str = str_repeat($indent_str, $_depth);
-    // ad hoc parsing not very fun.. use lemon or something?  or is that overkill
+    // ad hoc parsing not very fun.. use lemon or something? or is that overkill
     switch ($dump[$pos]) {
     case 'N':
       ___phpsh___parse_dump_assert($dump, $pos, 'NULL');
@@ -182,8 +185,8 @@ if (!function_exists('___phpsh___pretty_print')) {
       ___phpsh___parse_dump_assert($dump, $pos, '"', $normal_end_check);
       return ___phpsh___str_lit($str);
     default:
-      throw new Exception('parse error unrecognized type at position '.$pos.': '.
-        substr($dump, $pos));
+      throw new Exception('parse error unrecognized type at position '.$pos.
+                          ': '.substr($dump, $pos));
     }
   }
   function ___phpsh___parse_dump_arr_lines($x, $dump, &$pos, $arr_len, $depth,
@@ -219,7 +222,7 @@ if (!function_exists('___phpsh___pretty_print')) {
       ___phpsh___parse_dump_assert($dump, $pos, $depth_str.$indent_str.'[');
       $key = ___phpsh___parse_dump_delim_grab($dump, $pos, false, '""');
       if ($dump[$pos] == ':') {
-        $key .= ':' . ___phpsh___parse_dump_delim_grab($dump, $pos, false, ':]');
+        $key .= ':'.___phpsh___parse_dump_delim_grab($dump, $pos, false, ':]');
         $pos--;
       }
       ___phpsh___parse_dump_assert($dump, $pos, "]=>\n".$depth_str.$indent_str);

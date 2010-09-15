@@ -504,7 +504,8 @@ Make sure php-config is in your PATH."""
                 pos = bisect(self.autocomplete_identifiers, text)
 
                 while self.autocomplete_identifiers[pos].startswith(text):
-                    self.autocomplete_cache.append(self.autocomplete_identifiers[pos])
+                    identifiers = self.autocomplete_identifiers[pos]
+                    self.autocomplete_cache.append(identifiers)
                     pos = pos + 1
 
                 if self.function_signatures.has_key(text):
@@ -634,7 +635,7 @@ phpsh failed to initialize PHP.
 Fix the problem and hit enter to reload or ctrl-C to quit.""")
 
                 print self.clr_err
-                print "".join(filter(lambda x: x != "", e.stdout_lines + e.stderr_lines))
+                print "".join(filter(bool, e.stdout_lines + e.stderr_lines))
 
                 if e.line_num:
                     print("\
@@ -710,7 +711,8 @@ Type 'e' to open emacs or 'V' to open vim to %s: %s" %
             p_line = self.p.stdout.readline().rstrip()
             if p_line == "#end_autocomplete_identifiers":
                 break
-            self.autocomplete_identifiers.insert(bisect(self.autocomplete_identifiers, p_line), p_line)
+            self.autocomplete_identifiers.append(p_line)
+        self.autocomplete_identifiers.sort()
 
     def wait_for_comm_finish(self, defer_output=False):
         try:
