@@ -295,6 +295,7 @@ class LoadCtags(Thread):
     def __init__(self, phpsh_state):
         Thread.__init__(self)
         self.phpsh_state = phpsh_state
+        self.phpsh_state.function_signatures = {}
     def run(self):
         try:
            tags_file_path = None
@@ -311,7 +312,6 @@ class LoadCtags(Thread):
               self.phpsh_state.function_signatures = \
                   ctags.CtagsFunctionSignatures().function_signatures
            except Exception, e:
-              self.phpsh_state.function_signatures = {}
               print self.phpsh_state.clr_err + \
                   "Problem loading function signatures" + \
                   self.phpsh_state.clr_default
