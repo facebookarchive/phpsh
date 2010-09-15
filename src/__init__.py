@@ -635,7 +635,7 @@ phpsh failed to initialize PHP.
 Fix the problem and hit enter to reload or ctrl-C to quit.""")
 
                 print self.clr_err
-                print "".join(filter(bool, e.stdout_lines + e.stderr_lines))
+                print "".join(e.stdout_lines + e.stderr_lines)
 
                 if e.line_num:
                     print("\
