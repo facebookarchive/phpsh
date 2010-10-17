@@ -2,7 +2,7 @@ __version__ = "1.3"
 __author__ = "phpsh@googlegroups.com"
 __date__ = "Nov 20, 2008"
 
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, call
 from threading import Thread
 from bisect import bisect
 import ansicolor as clr
@@ -164,6 +164,14 @@ def line_encode(line):
 def inc_args(s):
     """process a string of includes to a set of them"""
     return set([inc.strip() for inc in s.split(" ") if inc.strip()])
+
+def xdebug_loaded():
+    """checks if Xdebug is already loaded"""
+    try:
+        retcode = call("php -m | grep Xdebug &> /dev/null", shell=True)
+        return retcode == 0
+    except OSError:
+        return False
 
 def get_php_ext_path():
    extension_dir = Popen("php-config | grep extension-dir",
@@ -394,47 +402,48 @@ class PhpshState:
 
         if self.with_xdebug:
             xdebug_comm_base = self.comm_base
-            php_ext_dir = get_php_ext_path()
-            if php_ext_dir:
-                if not self.xdebug_path:
-                    self.xdebug_path = php_ext_dir + "/xdebug.so"
-                try:
-                    os.stat(self.xdebug_path)
-                    xdebug_comm_base += " -d \'zend_extension"
-                    if php_ext_dir.find("php/extensions/debug") >= 0:
-                        xdebug_comm_base += "_debug"
-                    xdebug_comm_base += "=\"" + self.xdebug_path + "\"\' "
-                    # The following is a workaround if role.ini is overly
-                    # restrictive.  role.ini currently sets max nesting level
-                    # to 50 at facebook.
-                    xdebug_comm_base += "-d xdebug.max_nesting_level=500 "
+            if not xdebug_loaded():
+                php_ext_dir = get_php_ext_path()
+                if php_ext_dir:
+                    if not self.xdebug_path:
+                        self.xdebug_path = php_ext_dir + "/xdebug.so"
                     try:
-                        xdebug_version = self.get_xdebug_version(
-                            xdebug_comm_base)
-                        if xdebug_version < [2, 0, 3]:
-                            self.xdebug_disabled_reason = "\
+                        os.stat(self.xdebug_path)
+                        xdebug_comm_base += " -d \'zend_extension"
+                        if php_ext_dir.find("php/extensions/debug") >= 0:
+                            xdebug_comm_base += "_debug"
+                        xdebug_comm_base += "=\"" + self.xdebug_path + "\"\' "
+                        # The following is a workaround if role.ini is overly
+                        # restrictive.  role.ini currently sets max nesting
+                        # level to 50 at facebook.
+                        xdebug_comm_base += "-d xdebug.max_nesting_level=500 "
+                        try:
+                            xdebug_version = self.get_xdebug_version(
+                                xdebug_comm_base)
+                            if xdebug_version < [2, 0, 3]:
+                                self.xdebug_disabled_reason = "\
 Xdebug version %s is too low.  xdebug-2.0.3 or above required." % \
 xdebug_version
+                                self.with_xdebug = False
+                        except Exception, msg:
+                            self.xdebug_disabled_reason = self.xdebug_path + \
+                                " is incompatible with your php build"
                             self.with_xdebug = False
-                    except Exception, msg:
-                        self.xdebug_disabled_reason = self.xdebug_path + \
-                            " is incompatible with your php build"
+                    except OSError:
+                        self.xdebug_disabled_reason = \
+                            "xdebug.so not found, tried " + self.xdebug_path
                         self.with_xdebug = False
-                except OSError:
-                    self.xdebug_disabled_reason = \
-                        "xdebug.so not found, tried " + self.xdebug_path
-                    self.with_xdebug = False
-                    self.xdebug_path = None
-            else:
-                self.xdebug_disabled_reason = """\
+                        self.xdebug_path = None
+                else:
+                    self.xdebug_disabled_reason = """\
 Could not identify PHP extensions directory.
 Make sure php-config is in your PATH."""
-                self.with_xdebug = False
-                self.xdebug_path = None
-            if self.verbose and not self.with_xdebug and \
-                    self.xdebug_disabled_reason:
-                self.print_warning("PHP debugging will be disabled:\n" +
-                    self.xdebug_disabled_reason)
+                    self.with_xdebug = False
+                    self.xdebug_path = None
+                if self.verbose and not self.with_xdebug and \
+                        self.xdebug_disabled_reason:
+                    self.print_warning("PHP debugging will be disabled:\n" +
+                        self.xdebug_disabled_reason)
         if self.with_xdebug:
             self.comm_base = xdebug_comm_base
             self.start_xdebug_proxy()
