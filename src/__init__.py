@@ -689,7 +689,7 @@ Type 'e' to open emacs or 'V' to open vim to %s: %s" %
             os.putenv("XDEBUG_CONFIG", "remote_port=" + str(self.dbgp_port) +
                       " remote_enable=1");
         self.p = Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE,
-                       preexec_fn=os.setsid)
+                       preexec_fn=os.setsid, executable="/bin/bash")
         if self.with_xdebug:
             # disable remote debugging for other instances of php started by
             # this script, such as the multiline syntax verifyer
