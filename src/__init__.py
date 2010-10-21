@@ -398,10 +398,10 @@ class PhpshState:
                 else:
                     self.xdebug_path = xdebug
 
-        self.comm_base = "php "
+        self.comm_base = ["php"]
 
         if self.with_xdebug:
-            xdebug_comm_base = self.comm_base
+            xdebug_comm_base = self.comm_base[:]
             if not xdebug_loaded():
                 php_ext_dir = get_php_ext_path()
                 if php_ext_dir:
@@ -409,14 +409,17 @@ class PhpshState:
                         self.xdebug_path = php_ext_dir + "/xdebug.so"
                     try:
                         os.stat(self.xdebug_path)
-                        xdebug_comm_base += " -d \'zend_extension"
+                        xdebug_comm_base += ["-d"]
+                        extension = "zend_extension"
                         if php_ext_dir.find("php/extensions/debug") >= 0:
-                            xdebug_comm_base += "_debug"
-                        xdebug_comm_base += "=\"" + self.xdebug_path + "\"\' "
+                            extension += "_debug"
+                        extension += "=\"" + self.xdebug_path + "\""
+                        xdebug_comm_base += [extension]
                         # The following is a workaround if role.ini is overly
                         # restrictive.  role.ini currently sets max nesting
                         # level to 50 at facebook.
-                        xdebug_comm_base += "-d xdebug.max_nesting_level=500 "
+                        xdebug_comm_base += ["-d",
+                                             "xdebug.max_nesting_level=500"]
                         try:
                             xdebug_version = self.get_xdebug_version(
                                 xdebug_comm_base)
@@ -448,16 +451,17 @@ Make sure php-config is in your PATH."""
             self.comm_base = xdebug_comm_base
             self.start_xdebug_proxy()
 
-        self.comm_base += self.phpsh_root + "/phpsh.php " + \
-            self.temp_file_name + " " + cu.arg_esc(codebase_mode)
+        self.comm_base += [self.phpsh_root + "/phpsh.php",
+                           self.temp_file_name,
+                           codebase_mode]
         if not do_color:
-            self.comm_base += " -c"
+            self.comm_base += ["-c"]
         if not do_autocomplete:
-            self.comm_base += " -A"
+            self.comm_base += ["-A"]
         if self.config.get_option("General", "UndefinedFunctionCheck") == "no":
-            self.comm_base += " -u"
+            self.comm_base += ["-u"]
         if not self.with_xdebug:
-            self.comm_base += " -f"
+            self.comm_base += ["-f"]
         self.cmd_incs = cmd_incs
 
         # ctags integration
@@ -550,12 +554,11 @@ Make sure php-config is in your PATH."""
                 self.clr_default
 
     def get_xdebug_version(self, comm_base):
-        vline, err = Popen(comm_base + \
-            " -r 'phpinfo();' | grep '^ *with Xdebug v[0-9][0-9.]*'",
-            shell=True, stdout=PIPE, stderr=PIPE).communicate()
-        if not vline:
+        p = Popen(comm_base + ["-r", "phpinfo();"], stdout=PIPE, stderr=PIPE)
+        out, err = p.communicate()
+        if p.returncode is not 0:
             raise Exception, "Failed to load Xdebug\n" + err
-        m = re.compile(" *with Xdebug v([0-9.]+)").match(vline)
+        m = re.compile(" *with Xdebug v([0-9.]+)").search(out)
         if not m:
             raise Exception, \
                 "Could not find xdebug version number in phpinfo() output"
@@ -684,12 +687,16 @@ Type 'e' to open emacs or 'V' to open vim to %s: %s" %
 
     def php_open(self):
         self.autocomplete_identifiers = sorted(PHP_RESERVED_WORDS)
-        cmd = " ".join([self.comm_base] + list(self.cmd_incs))
+        cmd = self.comm_base + list(self.cmd_incs)
+        env = os.environ.copy()
+
         if self.with_xdebug:
-            os.putenv("XDEBUG_CONFIG", "remote_port=" + str(self.dbgp_port) +
-                      " remote_enable=1");
-        self.p = Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE,
-                       preexec_fn=os.setsid, executable="/bin/bash")
+           env["XDEBUG_CONFIG"] = \
+               "remote_port=%(port)s remote_enable=1" % {"port": self.dbgp_port}
+
+        self.p = Popen(cmd, env=env, stdin=PIPE, stdout=PIPE, stderr=PIPE,
+                       preexec_fn=os.setsid)
+
         if self.with_xdebug:
             # disable remote debugging for other instances of php started by
             # this script, such as the multiline syntax verifyer
