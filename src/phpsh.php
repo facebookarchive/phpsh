@@ -409,7 +409,13 @@ class ___Phpsh___ {
     $this->__send_autocomplete_identifiers($do_autocomplete);
     $this->do_color = $do_color;
     $this->do_undefined_function_check = $do_undefined_function_check;
+    if (!PCNTL_EXISTS && $fork_every_command) {
+      $fork_every_command = false;
+      fwrite(STDERR,
+             "Install pcntl to enable forking on every command.\n");
+    }
     $this->fork_every_command = $fork_every_command;
+
     // now it's safe to send any output the includes generated
     echo $output_from_includes;
     fwrite($this->_comm_handle, "ready\n");
@@ -561,7 +567,7 @@ class ___Phpsh___ {
         echo "\033[33m"; // yellow
       }
 
-      if (PCNTL_EXISTS and $this->fork_every_command) {
+      if ($this->fork_every_command) {
         $parent_pid = posix_getpid();
         $pid = pcntl_fork();
         $evalue = null;
