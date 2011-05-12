@@ -15,9 +15,11 @@ __Modules:__
 
 Python Dependencies
 ===================
+
+
 * sqlite  
   * Python <  2.6: `sudo easy_install pysqlite`  
-  * Python >= 2.6: `sudo easy_install sqlite3`
+  * Python >= 2.6: pysqlite should already be installed, since it's part of the stdlib
 * readline  
   * `sudo easy_install readline`
 
