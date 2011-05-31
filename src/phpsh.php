@@ -25,7 +25,7 @@ if (version_compare(PHP_VERSION, '5.0.0', '<')) {
   exit;
 }
 
-$missing = array_diff(array('pcre','posix','tokenizer'),
+$missing = array_diff(array('pcre','tokenizer'),
                       get_loaded_extensions());
 if ($missing) {
   fwrite(STDERR, 'Fatal error: phpsh requires the following extensions: '.
@@ -568,7 +568,7 @@ class ___Phpsh___ {
       }
 
       if ($this->fork_every_command) {
-        $parent_pid = posix_getpid();
+        $parent_pid = getmypid();
         $pid = pcntl_fork();
         $evalue = null;
         if ($pid) {
@@ -585,7 +585,7 @@ class ___Phpsh___ {
           }
 
           // if we are still alive..
-          $childpid = posix_getpid();
+          $childpid = getmypid();
           fwrite($this->_comm_handle, "child $childpid\n");
         }
       } else {
