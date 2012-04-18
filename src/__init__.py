@@ -474,7 +474,7 @@ Make sure php-config is in your PATH."""
         import rlcompleter
         input_rc_file = os.path.join(os.environ["HOME"], ".inputrc")
         if os.path.isfile(input_rc_file):
-            readline.read_init_file(input_rc_file)
+            readline.parse_and_bind(open(input_rc_file).read())
         readline.parse_and_bind("tab: complete")
 
         # persistent readline history
