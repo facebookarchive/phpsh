@@ -21,7 +21,9 @@ Python Dependencies
   * Python <  2.6: `sudo easy_install pysqlite`  
   * Python >= 2.6: pysqlite should already be installed, since it's part of the stdlib
 * readline  
-  * `sudo easy_install readline`
+  * Mac OS X: `sudo easy_install readline`
+  * ActivePython: `pypm install readline`
+  * Most Linux distributions: readline should already be installed, since it's part of the stdlib
 
 Installing Globally
 ===================
