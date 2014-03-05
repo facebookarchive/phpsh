@@ -14,7 +14,7 @@ if len(sys.argv) > 1 and sys.argv[1] == "build":
     os.waitpid(p.pid, 0)
 
 # something better than this?
-if os.getenv("USER") == "root":
+if os.getenv("USER") == "root" or not os.getenv("HOME"):
     config_dir = "/etc/phpsh"
 else:
     config_dir = os.getenv("HOME") + "/.phpsh"
