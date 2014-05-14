@@ -196,8 +196,12 @@ if (!function_exists('___phpsh___pretty_print')) {
       ___phpsh___parse_dump_assert($dump, $pos, '"', $normal_end_check);
       return ___phpsh___str_lit($str);
     default:
-      throw new Exception('parse error unrecognized type at position '.$pos.
-                          ': '.substr($dump, $pos));
+      if (ini_get('xdebug.cli_color') == '2') {
+        echo $dump;
+      } else {
+        throw new Exception('parse error unrecognized type at position '.$pos.
+                            ': '.substr($dump, $pos));
+      }
     }
   }
   function ___phpsh___parse_dump_arr_lines($x, $dump, &$pos, $arr_len, $depth,
