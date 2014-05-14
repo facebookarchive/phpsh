@@ -211,7 +211,7 @@ class PhpMultiliner:
         ls = [l for l in ls if l.find("PHP Startup:") == -1]
         l = "".join(ls)
         if l:
-            if l.find("unexpected $end") != -1:
+            if l.find("unexpected $end") != -1 or l.find("unexpected end") != -1:
                 return (self.incomplete, "")
             return (self.syntax_error, l)
         return (self.complete, "")
