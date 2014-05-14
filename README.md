@@ -1,3 +1,13 @@
+Archived Repo
+=============
+This is an archived project and is no longer supported or updated by Facebook. Please do not file issues or pull-requests against this repo. If you wish to continue to develop this code yourself, we recommend you fork it.
+
+Proceed and be bold!
+
+phpsh
+=====
+phpsh is a read-eval-print-loop for php that features readline history, tab completion, and quick access to documentation. It was developed at Facebook and ironically, is written mostly in python. It is open source and released under a modified BSD license.
+
 Mailing list at: [http://groups.google.com/group/phpsh]([http://groups.google.com/group/phpsh])
 
 PHP Dependencies
